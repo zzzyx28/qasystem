@@ -4,7 +4,7 @@ import { Upload, Loading, Link, DocumentCopy, Files, Scissor, Connection, DataLi
 import { ElMessage } from 'element-plus'
 import { preprocAcceptAttr, preprocFormatHint, isPreprocExtension } from '@/constants/preprocFormats'
 import { normalizeToRawFiles } from '@/utils/preprocUploadLogic'
-import { checkDocumentNameExists } from '@/api'
+import { checkDocumentNameExists, uploadDocument } from '@/api'
 import {
   SEDIMENT_STORAGE_KEY,
   SEDIMENT_STORAGE_VERSION,
@@ -47,6 +47,7 @@ const extractTypeOptions = [
   { value: 'SystemElement', label: '系统元素' }
 ]
 const selectedExtractTypes = ref(['Term'])
+const testUploadOnly = ref(true)
 
 const convertedCharCount = computed(() => (convertedText.value ? convertedText.value.length : 0))
 
@@ -168,7 +169,8 @@ function applySedimentFields(s, opts = {}) {
   modelsLoaded.value = Boolean(s.modelsLoaded)
   availableModels.value = s.availableModels && typeof s.availableModels === 'object' ? s.availableModels : {}
   pipelineRunning.value = Boolean(s.pipelineRunning)
-  uploadLoading.value = Boolean(s.uploadLoading)
+  // uploadLoading 仅应在正在执行流程时恢复，避免页面刷新后卡在“入库中...”
+  uploadLoading.value = Boolean(s.uploadLoading) && pipelineRunning.value
   selectedExtractTypes.value = Array.isArray(s.selectedExtractTypes) && s.selectedExtractTypes.length
     ? s.selectedExtractTypes
     : ['Term']
@@ -280,6 +282,37 @@ const runPipeline = async () => {
     ElMessage.warning('请先选择文档')
     return
   }
+  if (testUploadOnly.value) {
+    const isZip = String(selectedFile.value?.name || '').toLowerCase().endsWith(zipAcceptExt)
+    if (isZip) {
+      ElMessage.warning('测试模式不支持 ZIP 批量沉淀，请改为单文件上传')
+      return
+    }
+    uploadLoading.value = true
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile.value)
+      const { data } = await uploadDocument(formData)
+      storedDocument.value = data || null
+      stepError.value = ''
+      stepIndex.value = 0
+      convertedText.value = ''
+      chunks.value = []
+      extractResult.value = null
+      graphUpdateResult.value = null
+      preprocMeta.value = null
+      kgComputeResult.value = null
+      persistRefsToStorage()
+      ElMessage.success('已跳过知识沉淀，文档已加入列表')
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err?.message || '上传失败'
+      ElMessage.error(msg)
+    } finally {
+      uploadLoading.value = false
+      persistRefsToStorage()
+    }
+    return
+  }
   if (!selectedExtractTypes.value.length) {
     ElMessage.warning('请至少选择一个知识抽取类型')
     return
@@ -389,6 +422,16 @@ const openNeo4jBrowser = () => {
       </template>
 
       <div class="extract-type-row">
+        <span class="extract-type-label">执行模式</span>
+        <el-switch
+          v-model="testUploadOnly"
+          active-text="测试模式（仅入文档列表）"
+          inactive-text="完整沉淀（预处理/抽取/入图）"
+          :disabled="pipelineRunning || uploadLoading"
+        />
+      </div>
+
+      <div class="extract-type-row">
         <span class="extract-type-label">抽取类型</span>
         <el-checkbox-group v-model="selectedExtractTypes" :disabled="pipelineRunning">
           <el-checkbox
@@ -401,7 +444,7 @@ const openNeo4jBrowser = () => {
         </el-checkbox-group>
       </div>
       <p class="hint-text hint-text--top-space">
-        将按所选类型分别执行“知识抽取”并合并结果后写入图谱。
+        {{ testUploadOnly ? '测试模式下将直接入文档列表，不执行知识沉淀。' : '将按所选类型分别执行“知识抽取”并合并结果后写入图谱。' }}
       </p>
 
       <!-- 横向步骤进度可视化 -->

@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ....deps.auth import require_admin
+from ....deps.auth import get_current_user
 from . import service
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/api/component/intent-recognition",
     tags=["component", "intent-recognition"],
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(get_current_user)],
 )
 
 

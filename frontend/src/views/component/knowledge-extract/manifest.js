@@ -6,12 +6,13 @@ export const menuItem = {
   desc: '从文本中抽取指定主对象类型的实体与关系，支持本地模型与模板，可选择性写入 Neo4j 图谱。',
   icon: Reading,
   color: '#8B5CF6',
-  route: 'knowledge-extract'
+  route: 'knowledge-extract',
+  requiresAdmin: true
 }
 
 export const route = {
   path: 'knowledge-extract',
   name: 'knowledge-extract',
   component: () => import('./index.vue'),
-  meta: { title: '知识抽取' }
+  meta: { title: '知识抽取', requiresAdmin: true }
 }

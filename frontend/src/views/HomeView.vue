@@ -12,7 +12,17 @@ import {
   Monitor
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { getDocuments, kgUpdateStatistics, listUsersApi } from '@/api'
+import {
+  getDocuments,
+  kgUpdateStatistics,
+  listUsersApi,
+  documentPreprocHealthCheck,
+  intentRecognitionHealthCheck,
+  answerGenerationHealthCheck,
+  nl2cypherHealthCheck,
+  extractHealthCheck,
+  kgUpdateHealthCheck
+} from '@/api'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -24,11 +34,11 @@ const goTo = (path) => router.push(path)
 const stats = ref([
   { value: '--', label: '用户数量' },
   { value: '--', label: '文档数量' },
+  { value: '--', label: '图谱实体数' },
+  { value: '--', label: '图谱关系数' },
+  { value: '--', label: '组件可用数' },
   { value: '7x24', label: '在线服务时长' },
-  { value: '--', label: '图谱关系数' }
 ])
-
-const signalItems = ['线路态势', '风险预警', '标准校验', '故障追因']
 
 const quickQuestions = [
   '地铁列车制动系统故障如何处理？',
@@ -40,30 +50,30 @@ const quickQuestions = [
 const allFeatures = [
   {
     title: '智能问答',
-    desc: '结合大模型与RAG，生成可追溯、可复核的专业答案。',
+    desc: '面向业务问题进行多轮对话与知识增强问答。',
     icon: ChatDotRound,
     path: '/chat',
     requiresAdmin: false
   },
   {
-    title: '知识检索',
-    desc: '按语义与关键词双路径定位标准、规程与历史案例。',
-    icon: Document,
-    path: '/knowledge/query',
-    requiresAdmin: true
-  },
-  {
     title: '组件管理',
-    desc: '集中维护意图识别、图谱更新和答案生成链路。',
+    desc: '维护算法组件链路与能力编排，支撑核心流程运行。',
     icon: MapLocation,
     path: '/component',
+    requiresAdmin: false
+  },
+  {
+    title: '知识库',
+    desc: '管理文档资产、执行知识检索与统一知识沉淀。',
+    icon: Collection,
+    path: '/knowledge',
     requiresAdmin: true
   },
   {
-    title: '文档中心',
-    desc: '沉淀国标、行标与企业内部资料，支持版本化管理。',
-    icon: Collection,
-    path: '/knowledge',
+    title: '用户管理',
+    desc: '统一维护账号权限与系统访问控制策略。',
+    icon: Monitor,
+    path: '/admin/users',
     requiresAdmin: true
   }
 ]
@@ -71,6 +81,21 @@ const allFeatures = [
 const features = computed(() =>
   allFeatures.filter((item) => !item.requiresAdmin || auth.isAdmin)
 )
+
+const panelMetrics = computed(() => {
+  const entries = stats.value
+    .filter((item) => item.value !== '--' && item.label !== '在线服务时长')
+    .map((item) => {
+      const numeric = Number(String(item.value).replace(/,/g, ''))
+      return { ...item, numeric: Number.isFinite(numeric) ? numeric : 0 }
+    })
+
+  const maxValue = Math.max(...entries.map((item) => item.numeric), 1)
+  return entries.map((item) => ({
+    ...item,
+    ratio: Math.max(20, Math.round((item.numeric / maxValue) * 100))
+  }))
+})
 
 function formatMetric(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
@@ -87,19 +112,34 @@ function firstNumericValue(obj, keys) {
 
 async function loadRealStats() {
   if (!auth.isAdmin) {
+    const [intentHealthRes, answerHealthRes] = await Promise.allSettled([
+      intentRecognitionHealthCheck(),
+      answerGenerationHealthCheck()
+    ])
+    const totalComponentCount = 2
+    const availableComponentCount = [intentHealthRes, answerHealthRes].reduce((acc, res) => {
+      if (res.status !== 'fulfilled') return acc
+      return acc + (res.value?.data?.status === 'ok' ? 1 : 0)
+    }, 0)
     stats.value = [
-      { value: '--', label: '用户数量' },
-      { value: '--', label: '文档数量' },
+      { value: '已登录', label: '访问状态' },
+      { value: '2', label: '可用组件数' },
+      { value: `${availableComponentCount}/${totalComponentCount}`, label: '组件健康数' },
       { value: '7x24', label: '在线服务时长' },
-      { value: '--', label: '图谱关系数' }
     ]
     return
   }
 
-  const [usersRes, docsRes, kgRes] = await Promise.allSettled([
+  const [usersRes, docsRes, kgRes, ...healthRes] = await Promise.allSettled([
     listUsersApi(),
     getDocuments(),
-    kgUpdateStatistics()
+    kgUpdateStatistics(),
+    documentPreprocHealthCheck(),
+    intentRecognitionHealthCheck(),
+    answerGenerationHealthCheck(),
+    nl2cypherHealthCheck(),
+    extractHealthCheck(),
+    kgUpdateHealthCheck()
   ])
 
   const usersCount = usersRes.status === 'fulfilled' && Array.isArray(usersRes.value?.data)
@@ -110,15 +150,26 @@ async function loadRealStats() {
     : null
 
   const kgData = kgRes.status === 'fulfilled' ? (kgRes.value?.data || {}) : {}
+  const entityCount =
+    firstNumericValue(kgData, ['entity_count', 'entities', 'node_count', 'nodes']) ??
+    firstNumericValue(kgData.statistics, ['entity_count', 'entities', 'node_count', 'nodes'])
   const relationCount =
     firstNumericValue(kgData, ['relationship_count', 'relationships', 'relation_count', 'edges']) ??
     firstNumericValue(kgData.statistics, ['relationship_count', 'relationships', 'relation_count', 'edges'])
 
+  const totalComponentCount = healthRes.length
+  const availableComponentCount = healthRes.reduce((acc, res) => {
+    if (res.status !== 'fulfilled') return acc
+    return acc + (res.value?.data?.status === 'ok' ? 1 : 0)
+  }, 0)
+
   stats.value = [
     { value: formatMetric(usersCount), label: '用户数量' },
     { value: formatMetric(docsCount), label: '文档数量' },
-    { value: '7x24', label: '在线服务时长' },
-    { value: formatMetric(relationCount), label: '图谱关系数' }
+    { value: formatMetric(entityCount), label: '图谱实体数' },
+    { value: formatMetric(relationCount), label: '图谱关系数' },
+    { value: `${availableComponentCount}/${totalComponentCount}`, label: '组件可用数' },
+    { value: '7x24', label: '在线服务时长' }
   ]
 }
 
@@ -138,8 +189,8 @@ onMounted(() => {
         <div class="hero-copy">
           <el-tag class="hero-badge" effect="plain">Enterprise Knowledge Assistant</el-tag>
           <h1 class="hero-title">
-            面向轨道交通场景的
-            <span class="title-highlight">下一代智能知识入口</span>
+            <span class="hero-title-prefix">基于轨道交通行业知识图谱的</span>
+            <span class="title-highlight">知识服务系统</span>
           </h1>
           <p class="hero-desc">
             从检索到推理，从规范到问答，统一在一个现代化工作界面中完成。支持高并发问询与专业知识沉淀，兼顾效率和可信度。
@@ -161,19 +212,25 @@ onMounted(() => {
             <span class="dot dot-1" />
             <span class="dot dot-2" />
             <span class="dot dot-3" />
-            <span class="panel-title">Realtime Assistant Console</span>
+            <span class="panel-title">系统实时指标面板</span>
           </div>
           <div class="panel-body">
-            <div class="signal-chip" v-for="item in signalItems" :key="item">
+            <div class="signal-chip" v-for="item in panelMetrics" :key="item.label">
               <span class="signal-pulse" />
-              <span>{{ item }}</span>
+              <span>{{ item.label }}：{{ item.value }}</span>
             </div>
             <div class="mock-chart">
-              <div class="bar" v-for="n in 9" :key="n" :style="{ height: `${28 + (n % 4) * 14}px` }" />
+              <div
+                class="bar"
+                v-for="item in panelMetrics"
+                :key="item.label"
+                :style="{ height: `${item.ratio}px` }"
+                :title="`${item.label}: ${item.value}`"
+              />
             </div>
             <div class="panel-foot">
               <el-icon><TrendCharts /></el-icon>
-              <span>多轮会话与知识命中持续优化中</span>
+              <span>指标基于当前系统实时统计自动刷新</span>
             </div>
           </div>
         </div>
@@ -184,7 +241,7 @@ onMounted(() => {
       <div class="bento-grid">
         <article class="bento-card bento-main">
           <h3>核心能力矩阵</h3>
-          <p>围绕问答、检索、组件和文档四大模块构建统一智能中台。</p>
+          <p>聚焦问答服务、能力编排、知识管理与权限治理，形成端到端的智能业务闭环。</p>
           <div class="feature-list">
             <button
               v-for="item in features"
@@ -280,6 +337,12 @@ onMounted(() => {
   font-weight: 800;
   letter-spacing: -0.04em;
   margin-bottom: 20px;
+}
+
+.hero-title-prefix {
+  font-size: 0.78em;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 .hero-desc {

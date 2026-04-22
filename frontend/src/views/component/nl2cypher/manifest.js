@@ -6,12 +6,13 @@ export const menuItem = {
   desc: '将文本转为向量存储，不同逻辑下的文本切片，自然语言转Cypher。',
   icon: DocumentCopy,
   color: 'var(--primary-500)',
-  route: 'nl2cypher'
+  route: 'nl2cypher',
+  requiresAdmin: true
 }
 
 export const route = {
   path: 'nl2cypher',
   name: 'nl2cypher',
   component: () => import('./index.vue'),
-  meta: { title: '文本向量化与切片' }
+  meta: { title: '文本向量化与切片', requiresAdmin: true }
 }

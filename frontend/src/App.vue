@@ -12,7 +12,7 @@ const menuVisible = ref(false)
 const allNavItems = [
   { path: '/', name: '首页' },
   { path: '/chat', name: '智能问答' },
-  { path: '/component', name: '组件管理', requiresAdmin: true },
+  { path: '/component', name: '组件管理' },
   { path: '/knowledge', name: '知识库', requiresAdmin: true },
   { path: '/admin/users', name: '用户管理', requiresAdmin: true }
 ]

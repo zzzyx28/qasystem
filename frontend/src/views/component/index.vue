@@ -1,8 +1,15 @@
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { componentMenuItems } from './config'
 
 const router = useRouter()
+const auth = useAuthStore()
+
+const visibleComponentItems = computed(() =>
+  componentMenuItems.filter((item) => !item.requiresAdmin || auth.isAdmin)
+)
 
 const handleComponentClick = (item) => {
   if (item.route) {
@@ -28,7 +35,7 @@ const handleComponentClick = (item) => {
 
       <div class="component-grid">
         <el-card
-          v-for="item in componentMenuItems"
+          v-for="item in visibleComponentItems"
           :key="item.id"
           class="component-card"
           shadow="hover"

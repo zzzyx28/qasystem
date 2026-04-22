@@ -56,7 +56,7 @@ onMounted(() => {
       <header class="chat-toolbar">
         <div class="toolbar-title">
           <h1>智能问答</h1>
-          <p>当前页面已切换为 Dify 嵌入模式</p>
+          <p>Dify 嵌入模式</p>
         </div>
         <div class="toolbar-actions">
           <el-button plain :disabled="!difyWorkspaceUrl" @click="openDify">

@@ -32,7 +32,7 @@ const routes = [
     path: '/component',
     name: 'component',
     component: () => import('@/views/component/layout.vue'),
-    meta: { title: '组件管理', requiresAuth: true, requiresAdmin: true },
+    meta: { title: '组件管理', requiresAuth: true },
     redirect: '/component/index',
     children: [
       {
