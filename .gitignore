@@ -1,0 +1,193 @@
+# =============================================================================
+# 密钥与本地环境（允许 *.example）
+# =============================================================================
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+algorithm/**/.env
+!algorithm/**/.env.example
+
+# =============================================================================
+# Python
+# =============================================================================
+venv/
+.venv/
+**/.venv/
+**/venv/
+**/env/
+__pycache__/
+*/__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+build/
+develop-eggs/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.cover
+*.py,cover
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# 误生成的 pip 约束文件
+backend/=3.12
+*=3.12
+
+# =============================================================================
+# Node / 前端构建
+# =============================================================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+*.local
+
+# =============================================================================
+# 后端运行时数据与缓存（勿提交）
+# =============================================================================
+backend/data/documents/
+backend/data/preproc_output/
+backend/data/preproc_upload/
+backend/processed/
+backend/processed_files/
+backend/temp_files/
+backend/chroma_db/
+backend/app.log
+backend/*.log
+
+# =============================================================================
+# Docker / Milvus 本地数据
+# =============================================================================
+volumes/
+
+# =============================================================================
+# 日志
+# =============================================================================
+logs/
+*.log
+*.out
+*.err
+*.pid
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =============================================================================
+# 编辑器与 IDE
+# =============================================================================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.cursor/
+
+# =============================================================================
+# 操作系统
+# =============================================================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =============================================================================
+# 临时与备份
+# =============================================================================
+.cache/
+.tmp/
+tmp/
+temp/
+backup/
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# =============================================================================
+# 算法侧：训练日志与本地大结果（仓库内已跟踪的模型文件除外）
+# =============================================================================
+algorithm/confidence_calculate/lightning_logs/
+algorithm/confidence_calculate/test_results.json
+
+# 冲突检测：忽略生成物，保留 data/ 下示例 TTL（见下方否定规则）
+algorithm/conflict_detection/results/
+*.lp
+repair_result.txt
+
+# 生成的 TTL；保留 conflict_detection 示例数据
+*.ttl
+!algorithm/conflict_detection/data/insert.ttl
+!algorithm/conflict_detection/data/delete.ttl
+!algorithm/conflict_detection/data/shape.ttl
+
+# =============================================================================
+# 杂项
+# =============================================================================
+gitignore/
+frontend/frontend_venv/
+
+# large model/artifact files
+algorithm/confidence_calculate/final_model.pt
+algorithm/preproc/LibreOffice-fresh.full-x86_64.AppImage
+algorithm/NL_to_cypher/bge-small-zh-v1.5/model.safetensors
+algorithm/NL_to_cypher/bge-small-zh-v1.5/pytorch_model.bin
+
+# =============================================================================
+# 通用大模型/权重/本地二进制产物（防止误提交）
+# =============================================================================
+# 模型权重与检查点
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+*.pb
+*.h5
+*.tflite
+*.gguf
+*.ggml
+*.engine
+*.trt
+*.mar
+
+# 打包或运行时大二进制
+*.AppImage
+*.dmg
+*.iso
+
+# 常见模型目录命名
+**/models/
+**/checkpoints/
+**/weights/
+**/snapshots/
