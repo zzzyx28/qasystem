@@ -30,6 +30,28 @@ def call_llm(prompt: str, timeout: int = 500) -> str:
 MILVUS_DB_PATH="http://localhost:19530"
 MODEL_PATH = _root / "NL_to_cypher" / "bge-small-zh-v1.5"
 
+
+def _milvus_host_port() -> tuple[str, str]:
+    """与 backend/.env 中 MILVUS_URI 或 MILVUS_HOST、MILVUS_PORT 对齐。"""
+    uri = (os.getenv("MILVUS_URI") or "").strip()
+    if uri:
+        from urllib.parse import urlparse
+
+        u = uri if "://" in uri else f"http://{uri}"
+        parsed = urlparse(u)
+        host = parsed.hostname or "127.0.0.1"
+        port = str(parsed.port or 19530)
+        return host, port
+    host = os.getenv("MILVUS_HOST", "localhost")
+    port = os.getenv("MILVUS_PORT", "19530")
+    return host, port
+
+
+def _milvus_collection_name() -> str:
+    """Milvus 集合名：仅读 backend/.env 的 COLLECTION_NAME（与意图识别等模块共用）。"""
+    return (os.getenv("COLLECTION_NAME") or "").strip() or "intent_rag"
+
+
 class CustomHuggingFaceEmbeddings(Embeddings):
     def __init__(self, model, tokenizer):
         self.model = model
@@ -156,15 +178,17 @@ def embedding(split_docs: list):
         model = AutoModel.from_pretrained(MODEL_PATH, local_files_only=True)
         custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
         print("模型加载成功")
+        milvus_host, milvus_port = _milvus_host_port()
+        collection_name = _milvus_collection_name()
         # 存储到milvus数据库
         vector_store = Milvus.from_documents(
                 documents=split_docs,
                 embedding=custom_embedding,
                 connection_args={
-                    "host": "localhost",
-                    "port": "19530"
+                    "host": milvus_host,
+                    "port": milvus_port
                 },
-                collection_name="vector_info",  # 集合名称
+                collection_name=collection_name,
                 drop_old=False,  # 是否覆盖现有集合
             )
         print("向量存储成功")
@@ -182,9 +206,10 @@ def load_vector_store():
         tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
         model = AutoModel.from_pretrained(MODEL_PATH, local_files_only=True)
         custom_embedding = CustomHuggingFaceEmbeddings(model, tokenizer)
-        collection_name="vector_info"
-        connections.connect(host="localhost", port="19530")
-        print(f"连接到 Milvus")
+        collection_name = _milvus_collection_name()
+        milvus_host, milvus_port = _milvus_host_port()
+        connections.connect(host=milvus_host, port=milvus_port)
+        print(f"连接到 Milvus ({milvus_host}:{milvus_port}), 集合: {collection_name}")
         
         # 2. 加载集合
         collection = Collection(collection_name)
@@ -304,35 +329,27 @@ def interactive_qa(): #多轮问答
         except Exception as e:
             print(f"查询过程中出现错误: {e}")
 
+
 def get_vector_by_database_id(database_id: str) -> Optional[Dict[str, Any]]:
     all_data = load_vector_store()
     if not all_data:
         print("向量数据库加载失败或为空")
         return None
-    
-    # 查找指定数据库ID
+
     target_id = str(database_id).strip()
-    
     for i, item in enumerate(all_data):
-        # 检查各种可能的ID字段
-        item_id = item.get('pk') or item.get('id') or item.get('_id')
-        
+        item_id = item.get("pk") or item.get("id") or item.get("_id") or item.get("intent_id")
         if item_id is not None and str(item_id) == target_id:
-            # 获取文本内容
-            text_content = item.get('text', '')
+            text_content = item.get("text", "")
             if isinstance(text_content, dict):
-                # 如果text是字典，提取实际文本
-                text_content = text_content.get('text', '') or str(text_content)
-            
-            # 构建返回结果
-            result = {
-                'database_id': item_id,
-                'index': i,
-                'content': text_content,
-                'source': item.get('source', ''),
+                text_content = text_content.get("text", "") or str(text_content)
+            return {
+                "database_id": item_id,
+                "index": i,
+                "content": text_content,
+                "source": item.get("source", ""),
             }
-            return result
-    
+
     print(f"未找到数据库ID为 '{database_id}' 的向量片段")
     return None
 
@@ -380,32 +397,94 @@ def load_json_nodes(json_file: str) -> List[Dict[str, Any]]:
         return []
 
 def get_vectors_for_nodes(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    从节点数据中提取有VectorAddress的节点，并从向量数据库获取内容
-    
-    Args:
-        nodes: 节点数据列表
-    
-    Returns:
-        包含节点和向量内容的列表
-    """
-    results = []
-    
+    """从节点数据中提取有 VectorAddress 的节点，并从向量数据库获取内容。"""
+    results: List[Dict[str, Any]] = []
+
     for node in nodes:
-        properties = node.get('properties', {})
-        
-        # 检查是否有VectorAddress字段
-        if 'VectorAddress' in properties:
-            vector_id = properties['VectorAddress']
-            
-            # 从向量数据库获取内容
-            vector_content = get_vector_by_database_id(vector_id)
-            
-            if vector_content:
-                results.append(vector_content)
-    
+        properties = node.get("properties", {})
+        if "VectorAddress" not in properties:
+            continue
+        vector_id = properties["VectorAddress"]
+        vector_content = get_vector_by_database_id(vector_id)
+        if vector_content:
+            results.append(vector_content)
+
     print(f"找到 {len(results)} 个有VectorAddress的节点")
     return results
+
+
+_VECTORISH_KEY_PARTS = ("vector", "embedding", "dense")
+
+
+def _milvus_pk(item: Dict[str, Any]) -> Any:
+    return item.get("pk") or item.get("id") or item.get("_id") or item.get("intent_id")
+
+
+def _milvus_text_content(item: Dict[str, Any]) -> str:
+    t = item.get("text", "")
+    if isinstance(t, dict):
+        t = t.get("text", "") or str(t)
+    return str(t) if t else ""
+
+
+def _is_probably_embedding_vector(v: Any) -> bool:
+    if not isinstance(v, list) or len(v) < 32:
+        return False
+    sample = v[: min(16, len(v))]
+    return all(isinstance(x, (int, float)) for x in sample)
+
+
+def _milvus_row_metadata_summary(item: Dict[str, Any]) -> Dict[str, Any]:
+    """除 text / 向量列外，保留标量与小结构体，供前端展示。"""
+    out: Dict[str, Any] = {}
+    for k, v in item.items():
+        ks = str(k).lower()
+        if any(p in ks for p in _VECTORISH_KEY_PARTS):
+            continue
+        if k == "text":
+            continue
+        if _is_probably_embedding_vector(v):
+            continue
+        try:
+            if isinstance(v, (str, int, float, bool)) or v is None:
+                out[k] = v
+            elif isinstance(v, dict):
+                s = json.dumps(v, ensure_ascii=False)
+                if len(s) <= 800:
+                    out[k] = v
+            elif isinstance(v, list) and not _is_probably_embedding_vector(v):
+                s = json.dumps(v, ensure_ascii=False)
+                if len(s) <= 800:
+                    out[k] = v
+        except Exception:
+            pass
+    return out
+
+
+def list_all_milvus_rows_for_multiretriever() -> List[Dict[str, Any]]:
+    """Milvus 当前集合全表摘要；用于 mutiRetriever 在 records.json 与主键不一致时的回退。"""
+    all_data = load_vector_store()
+    if not all_data:
+        print("list_all_milvus_rows_for_multiretriever: 向量库为空或加载失败")
+        return []
+    rows: List[Dict[str, Any]] = []
+    for i, item in enumerate(all_data):
+        pk = _milvus_pk(item)
+        text = _milvus_text_content(item)
+        row: Dict[str, Any] = {
+            "database_id": pk,
+            "index": i,
+            "content": text,
+            "source": str(item.get("source", "") or ""),
+            "milvus_hit": True,
+        }
+        meta = _milvus_row_metadata_summary(item)
+        if meta:
+            row["metadata"] = meta
+        rows.append(row)
+    print(f"list_all_milvus_rows_for_multiretriever: 导出 {len(rows)} 条")
+    return rows
+
 
 # extract_final_response 已由 llm_client 提供
 

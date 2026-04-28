@@ -6,7 +6,7 @@ import {
   uploadDocument,
   checkDocumentNameExists,
   documentPreprocConvert,
-  parseChunkedJsonExtract,
+  knowledgeExtract,
   nl2cypherSplitMarkdown,
   getAvailableModels,
   processSchemaOutput,
@@ -131,6 +131,12 @@ function mergePublish(prev, partial) {
     ...prev,
     ...partial
   }
+}
+
+function mergeRawResults(results) {
+  if (!Array.isArray(results) || !results.length) return {}
+  if (results.length === 1) return results[0]?.raw || {}
+  return {}
 }
 
 /**
@@ -262,19 +268,30 @@ export async function runKnowledgeSedimentPipeline({
     publish({ chunks, stepIndex: 2 })
 
     const selectedTypes = normalizeExtractTypes(extractTypes)
-    const chunkPayload = JSON.stringify({ chunks }, null, 0)
     const extracts = []
     for (const mainObject of selectedTypes) {
-      const chunkBlob = new Blob([chunkPayload], { type: 'application/json;charset=utf-8' })
-      const extractForm = new FormData()
-      extractForm.append('file', chunkBlob, 'chunks.json')
-      extractForm.append('main_object', mainObject)
-      extractForm.append('use_templates', 'true')
-      const { data } = await parseChunkedJsonExtract(extractForm, { signal: controller.signal })
+      const chunkExtracts = []
+      for (const chunkText of chunks) {
+        ensureActive()
+        const text = String(chunkText || '').trim()
+        if (!text) continue
+        const { data } = await knowledgeExtract(
+          {
+            main_object: mainObject,
+            text,
+            use_templates: true
+          },
+          { signal: controller.signal }
+        )
+        chunkExtracts.push({
+          raw: data?.raw ?? {},
+          graph: data?.graph ?? { nodes: [], relationships: [], ontology_relations: [] }
+        })
+      }
       extracts.push({
         type: mainObject,
-        raw: data?.raw ?? {},
-        graph: data?.graph ?? { nodes: [], relationships: [], ontology_relations: [] }
+        raw: mergeRawResults(chunkExtracts),
+        graph: mergeGraphResults(chunkExtracts)
       })
       ensureActive()
     }

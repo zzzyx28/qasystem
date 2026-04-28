@@ -13,7 +13,7 @@ export function extractHealthCheck() {
  * 知识抽取
  * @param {object} params - main_object, text, use_templates, llm_base_url, llm_model, llm_api_key
  */
-export function knowledgeExtract(params) {
+export function knowledgeExtract(params, requestConfig = {}) {
   return request.post('/component/knowledge-extract/extract', {
     main_object: params.main_object.trim(),
     text: params.text.trim(),
@@ -21,7 +21,7 @@ export function knowledgeExtract(params) {
     llm_base_url: params.llm_base_url || undefined,
     llm_model: params.llm_model || undefined,
     llm_api_key: params.llm_api_key || undefined
-  }, { timeout: 90000 })
+  }, { timeout: 90000, ...requestConfig })
 }
 
 /**

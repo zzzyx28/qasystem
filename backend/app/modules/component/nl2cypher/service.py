@@ -61,7 +61,7 @@ def _get_splitter():
         raise
 
 
-def _make_docs(text: str, source: str):
+def _make_docs(text: str, source: str = "unknown"):
     """创建文档并添加 metadata"""
     from langchain_core.documents import Document
     return [Document(page_content=text, metadata={"source": source})]
@@ -100,10 +100,15 @@ def muti_retriever()->List[Dict[str, Any]]:
     except Exception as e:
         logger.warning("加载 RAG 模块失败: %s", e)
         raise
-    # 模拟上游数据
-    nodes = rag.load_json_nodes(_NL2CYPHER_ROOT/"records.json")
+    nodes = rag.load_json_nodes(_NL2CYPHER_ROOT / "records.json")
     results = rag.get_vectors_for_nodes(nodes)
-    return results
+    if results:
+        return _json_safe(results)
+    logger.info(
+        "mutiRetriever: records.json 中 VectorAddress 未在 Milvus 命中任何条，回退为当前集合全表导出"
+    )
+    fallback = rag.list_all_milvus_rows_for_multiretriever()
+    return _json_safe(fallback)
 
 
 def text2vector(text: str,source:str) -> dict[str, Any]:
@@ -127,23 +132,55 @@ def text2vector(text: str,source:str) -> dict[str, Any]:
 
     return {"status": "ok", "chunks": [d.page_content for d in split_docs]}
 
-def get_all_vectors() -> List[Dict[str, Any]]:
-    """获取所有向量和对应的文本片段"""
+
+def _json_safe(obj: Any) -> Any:
+    """Milvus 查询结果中可能含 protobuf RepeatedScalarContainer、numpy 标量等，需转为可 JSON 序列化类型。"""
+    if obj is None or isinstance(obj, bool):
+        return obj
+    if isinstance(obj, str):
+        return obj
+    if isinstance(obj, (int, float)):
+        return obj
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace")
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(x) for x in obj]
+    try:
+        import numpy as np
+
+        if isinstance(obj, np.generic):
+            return obj.item()
+        if isinstance(obj, np.ndarray):
+            return _json_safe(obj.tolist())
+    except ImportError:
+        pass
+    if hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes, dict)):
+        try:
+            return [_json_safe(x) for x in list(obj)]
+        except Exception:
+            pass
+    return str(obj)
+
+
+def get_all_vectors() -> Dict[str, Any]:
+    """获取所有向量和对应的文本片段（统一为 dict，与路由 dict 返回类型及前端约定一致）。"""
     try:
         import rag
-        import numpy as np
-        from langchain_core.documents import Document
     except Exception as e:
         logger.warning("加载依赖失败: %s", e)
         return {"vectors": [], "stats": None}
 
     try:
-        # 加载向量数据库
-        vector_store = rag.load_vector_store()
-        if vector_store is None:
+        raw = rag.load_vector_store()
+        if raw is None:
             return {"vectors": [], "stats": {"total": 0, "message": "向量数据库获取失败"}}
-        return vector_store
-        
+        if isinstance(raw, dict):
+            return _json_safe(raw)
+        if isinstance(raw, list):
+            return {"vectors": _json_safe(raw), "stats": None}
+        return {"vectors": [], "stats": None}
     except Exception as e:
         logger.error("获取向量数据失败: %s", e, exc_info=True)
         return {"vectors": [], "stats": {"message": f"内部错误: {str(e)}"}}

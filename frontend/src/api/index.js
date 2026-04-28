@@ -90,16 +90,10 @@ export function nl2cypherText2vector(text, fileName = '') {
   }, { timeout: 120000 })
 }
 
-export const nl2cypherGetVectors = () => {
-  return request({
-    url: '/component/nl2cypher/vectors',
-    method: 'get'
-  })
-}
-
 export const mutiRetriever = () => {
   return request({
     url: '/component/nl2cypher/mutiRetriever',
     method: 'get'
   })
 }
+

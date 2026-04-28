@@ -45,6 +45,19 @@ export const useAuthStore = defineStore('auth', () => {
     await request.post('/auth/register', { username, password })
   }
 
+  async function changePassword(currentPassword, newPassword) {
+    const { data } = await request.patch('/users/me/password', {
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+    user.value = {
+      id: data.id,
+      username: data.username,
+      role: data.role,
+      created_at: data.created_at
+    }
+  }
+
   function logout() {
     setToken('')
     user.value = null
@@ -60,6 +73,7 @@ export const useAuthStore = defineStore('auth', () => {
     fetchMe,
     login,
     register,
+    changePassword,
     logout
   }
 })

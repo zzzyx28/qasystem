@@ -2,8 +2,7 @@
 import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import { MagicStick, Loading, UploadFilled, Download } from '@element-plus/icons-vue'
 import { nl2cypherHealthCheck, nl2cypherGenerate } from '@/api'
-import { nl2cypherSplitCharacter, nl2cypherSplitRecursive, nl2cypherSplitMarkdown, nl2cypherSplitPython, nl2cypherText2vector, nl2cypherGetVectors } from '@/api'
-import { mutiRetriever } from '@/api'
+import { nl2cypherSplitCharacter, nl2cypherSplitRecursive, nl2cypherSplitMarkdown, nl2cypherSplitPython, nl2cypherText2vector } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
@@ -34,11 +33,6 @@ const fileName = ref('')
 const resultCypher = ref('')
 const splitResult = ref(null)
 const vectorResult = ref('')
-//多源数据检索
-const loadingMuti = ref(false)
-const multiResults = ref([])
-const multiStats = ref(null)
-
 
 // 菜单项
 const menuItems = [
@@ -55,7 +49,6 @@ const menuItems = [
     ],
   },
   { key: 'vector', label: '文本向量化与存储', tooltip: '将文本向量化并写入数据库以备后续检索' },
-  { key: 'multi-retrieve', label: '多源数据检索', tooltip: '从JSON文件中检索节点对应的向量内容' },
 ]
 
 // 工具提示映射
@@ -74,15 +67,6 @@ const vectorDataAvailable = computed(() => {
   return healthStatus.value === 'ok'
 })
 
-const uniqueClusters = computed(() => {
-  if (!vectorStats.value?.clusterCounts) return []
-  return Object.keys(vectorStats.value.clusterCounts)
-})
-
-const clusterCounts = computed(() => {
-  return vectorStats.value?.clusterCounts || {}
-})
-
 // 监听功能切换
 watch(activeFeature, (newVal) => {
   form.value.splitText = ''
@@ -97,10 +81,6 @@ watch(activeFeature, (newVal) => {
     if (!activeSubFeature.value) {
       activeSubFeature.value = menuItems.find(i => i.key === 'split')?.children?.[0]?.key || ''
     }
-  }
-  if (newVal !== 'multi-retrieve') {
-    multiResults.value = []
-    multiStats.value = null
   }
 })
 
@@ -377,44 +357,6 @@ onMounted(() => {
   checkHealth()
 })
 
-//多源检索
-const loadMultiRetrieve = async () => {
-  loadingMuti.value = true
-  multiResults.value = []
-  
-  try {
-    const { data } = await mutiRetriever()
-    
-    if (data && Array.isArray(data)) {
-      // 处理数据，添加必要的字段
-      multiResults.value = data.map(item => ({
-        database_id: item.database_id || 'N/A',
-        index: item.index || 0,
-        content: item.content || '无内容',
-        source: item.source || '未知来源',
-        metadata: item.metadata || {},
-        // 可以添加其他处理后的字段
-        content_preview: item.content ? item.content.substring(0, 200) + (item.content.length > 200 ? '...' : '') : '无内容'
-      }))
-      
-      ElMessage.success({
-        message: `向量检索完成，共找到 ${data.length} 条数据`,
-        type: 'success',
-        duration: 3000
-      })
-    } else {
-      ElMessage.error('检索失败，无数据返回')
-    }
-  } catch (err) {
-    ElMessage.error({
-      message: err?.response?.data?.detail || err?.message || '检索失败',
-      type: 'error',
-      duration: 5000
-    })
-  } finally {
-    loadingMuti.value = false
-  }
-}
 </script>
 
 <template>
@@ -1092,115 +1034,10 @@ const loadMultiRetrieve = async () => {
             </div>
           </div>
         </el-card>
-        <!--多源数据检索-->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'multi-retrieve'">
-          <template #header>
-            <span>多源数据检索</span>
-          </template>
-          <!-- 新增链接区域 -->
-          <div style="margin-bottom: 20px; text-align: center;">
-            <div style="margin-bottom: 15px; display: flex; gap: 20px; justify-content: center;">
-              <el-link 
-                type="primary" 
-                :underline="false" 
-                href="http://localhost:7474/browser/" 
-                target="_blank"
-                style="padding: 8px 16px; border: 1px solid #409eff; border-radius: 4px;"
-              >
-                图数据库管理
-              </el-link>
-              <el-link 
-                type="success" 
-                :underline="false" 
-                href="http://10.126.62.88:5601/app/enterprise_search/elasticsearch" 
-                target="_blank"
-                style="padding: 8px 16px; border: 1px solid #67c23a; border-radius: 4px;"
-              >
-                文档数据库管理
-              </el-link>
-              <el-link 
-                type="primary" 
-                :underline="false" 
-                href="http://10.126.62.88:8787/#/databases/default" 
-                target="_blank"
-                style="padding: 8px 16px; border: 1px solid #409eff; border-radius: 4px;"
-              >
-                向量数据库管理
-              </el-link>
-            </div>
-          </div>
-          <!-- 控制按钮 -->
-          <div style="margin-bottom: 20px; text-align: center;">
-            <el-button
-              type="primary"
-              :loading="loadingMuti"
-              :icon="MagicStick"
-              @click="loadMultiRetrieve"
-            >
-              查找向量库
-            </el-button>
-          </div>
-          
-          <!-- 加载状态 -->
-          <div v-if="loadingMuti" class="loading-container" style="text-align: center; padding: 20px;">
-            <el-icon class="is-loading" :size="30"><Loading /></el-icon>
-            <p>正在检索数据...</p>
-          </div>
-          
-          <!-- 搜索结果展示 -->
-          <div v-else-if="multiResults && multiResults.length > 0" style="margin-top: 20px;">
-            <!-- 统计信息 -->
-            <el-alert 
-              :title="`检索完成，共找到 ${multiResults.length} 条数据`" 
-              type="success" 
-              :closable="false"
-              style="margin-bottom: 20px;"
-            />
-            
-            <!-- 数据列表 -->
-            <div v-for="(item, index) in multiResults" :key="index" class="result-item" style="margin-bottom: 20px; padding: 15px; border: 1px solid #ebeef5; border-radius: 4px;">
-              <!-- 头部信息 -->
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div>
-                  <el-tag type="info" size="small">ID: {{ item.database_id }}</el-tag>
-                  <el-tag type="primary" size="small" style="margin-left: 8px;">索引: {{ item.index }}</el-tag>
-                </div>
-                <el-tag type="success" size="small">{{ item.source }}</el-tag>
-              </div>
-              
-              <!-- 内容展示 -->
-              <div style="margin-bottom: 10px;">
-                <div style="color: #606266; font-size: 12px; margin-bottom: 5px;">内容：</div>
-                <div style="background-color: #f5f7fa; padding: 10px; border-radius: 4px; max-height: 150px; overflow-y: auto;">
-                  {{ item.content }}
-                </div>
-              </div>
-              
-              <!-- 元数据信息 -->
-              <div v-if="item.metadata && Object.keys(item.metadata).length > 0" style="margin-top: 10px;">
-                <el-collapse>
-                  <el-collapse-item title="查看更多元数据">
-                    <div style="font-size: 12px; color: #909399;">
-                      <div v-for="(value, key) in item.metadata" :key="key" style="margin-bottom: 5px;">
-                        <span style="color: #606266;">{{ key }}: </span>
-                        <span>{{ typeof value === 'object' ? JSON.stringify(value) : value }}</span>
-                      </div>
-                    </div>
-                  </el-collapse-item>
-                </el-collapse>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 无数据状态 -->
-          <div v-else-if="!loadingMuti" style="text-align: center; padding: 40px 0;">
-            <el-empty description="点击上方按钮开始检索" />
-          </div>
-        </el-card>
         <!-- 其他功能保持占位或说明 -->
         <el-card class="form-card" shadow="hover" v-if="
           activeFeature === 'split' && !activeSubFeature ||
-          (activeFeature !== 'cypher' && activeFeature !== 'split' && activeFeature !== 'vector' && activeFeature !== 'multi-retrieve')
+          (activeFeature !== 'cypher' && activeFeature !== 'split' && activeFeature !== 'vector')
         ">
           <template #header>
             <span v-if="activeFeature === 'split'">

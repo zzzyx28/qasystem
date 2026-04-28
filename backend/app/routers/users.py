@@ -10,7 +10,7 @@ from ..core.roles import ROLE_ADMIN, ROLE_USER
 from ..db import get_session
 from ..deps.auth import get_current_user
 from ..models.user import User
-from ..core.passwords import PasswordPlain, hash_password, verify_password
+from ..core.passwords import AdminNewPassword, PasswordPlain, hash_password, verify_password
 from ..services.auth import create_access_token
 
 router = APIRouter(prefix="/api", tags=["users", "auth"])
@@ -31,6 +31,11 @@ class UserRead(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: AdminNewPassword
 
 
 @router.post("/auth/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -90,6 +95,25 @@ async def login(
 async def read_current_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> UserRead:
+    return UserRead(
+        id=current_user.id,
+        username=current_user.username,
+        role=current_user.role,
+        created_at=current_user.created_at.isoformat(),
+    )
+
+
+@router.patch("/users/me/password", response_model=UserRead)
+async def change_own_password(
+    body: PasswordChange,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> UserRead:
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="当前密码错误")
+    current_user.hashed_password = hash_password(body.new_password)
+    await db.commit()
+    await db.refresh(current_user)
     return UserRead(
         id=current_user.id,
         username=current_user.username,

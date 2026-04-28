@@ -1,13 +1,86 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Menu, Close, Key, SwitchButton, Plus } from '@element-plus/icons-vue'
+import { Menu, Close, Key, SwitchButton, Plus, User, Lock } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const menuVisible = ref(false)
+const accountDialogVisible = ref(false)
+const pwdSubmitting = ref(false)
+const pwdForm = reactive({
+  current: '',
+  new1: '',
+  new2: ''
+})
+
+const roleLabel = computed(() => {
+  const r = auth.user?.role
+  if (r === 'admin') return '管理员'
+  if (r === 'user') return '普通用户'
+  return r || '—'
+})
+
+function formatCreated(iso) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return d.toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
+  } catch {
+    return iso
+  }
+}
+
+function resetPwdForm() {
+  pwdForm.current = ''
+  pwdForm.new1 = ''
+  pwdForm.new2 = ''
+}
+
+function openAccountPanel() {
+  menuVisible.value = false
+  resetPwdForm()
+  accountDialogVisible.value = true
+}
+
+watch(accountDialogVisible, (open) => {
+  if (!open) resetPwdForm()
+})
+
+async function submitPasswordChange() {
+  if (!pwdForm.current) {
+    ElMessage.warning('请输入当前密码')
+    return
+  }
+  if (!pwdForm.new1 || pwdForm.new1.length < 6) {
+    ElMessage.warning('新密码至少 6 位')
+    return
+  }
+  if (pwdForm.new1 !== pwdForm.new2) {
+    ElMessage.warning('两次输入的新密码不一致')
+    return
+  }
+  pwdSubmitting.value = true
+  try {
+    await auth.changePassword(pwdForm.current, pwdForm.new1)
+    resetPwdForm()
+    ElMessage.success('密码已更新')
+  } catch (e) {
+    const msg = e?.response?.data?.detail
+    ElMessage.error(typeof msg === 'string' ? msg : e?.message || '修改失败')
+  } finally {
+    pwdSubmitting.value = false
+  }
+}
+
+function onLogoutFromPanel() {
+  accountDialogVisible.value = false
+  onLogout()
+}
 
 const allNavItems = [
   { path: '/', name: '首页' },
@@ -93,9 +166,9 @@ const isMobile = computed(() => {
                 <span class="user-avatar-sm">{{ (auth.user?.username || '?').charAt(0).toUpperCase() }}</span>
                 <span class="nav-user-name">{{ auth.user?.username }}</span>
               </div>
-              <el-button class="header-auth-btn is-block" plain type="danger" @click="onLogout">
-                <el-icon><SwitchButton /></el-icon>
-                退出登录
+              <el-button class="header-auth-btn is-block" plain @click="openAccountPanel">
+                <el-icon><User /></el-icon>
+                个人中心
               </el-button>
             </template>
             <template v-else>
@@ -114,14 +187,15 @@ const isMobile = computed(() => {
         <div class="header-actions">
           <div class="auth-cluster" :class="{ 'auth-cluster--hidden-mobile': isMobile }">
             <template v-if="auth.isAuthenticated">
-              <div class="user-pill" :title="auth.user?.username">
+              <button
+                type="button"
+                class="user-pill user-pill--clickable"
+                :title="auth.user?.username + ' — 个人中心'"
+                @click="openAccountPanel"
+              >
                 <span class="user-avatar">{{ (auth.user?.username || '?').charAt(0).toUpperCase() }}</span>
                 <span class="user-pill-name">{{ auth.user?.username }}</span>
-              </div>
-              <el-button class="header-auth-btn" plain type="danger" @click="onLogout">
-                <el-icon><SwitchButton /></el-icon>
-                退出
-              </el-button>
+              </button>
             </template>
             <template v-else>
               <el-button class="header-auth-btn" plain @click="goLogin">
@@ -152,6 +226,93 @@ const isMobile = computed(() => {
         </transition>
       </router-view>
     </main>
+
+    <el-dialog
+      v-model="accountDialogVisible"
+      width="440px"
+      class="account-dialog"
+      destroy-on-close
+      align-center
+      append-to-body
+      :show-close="true"
+    >
+      <template #header>
+        <div v-if="auth.user" class="account-dialog-header">
+          <div class="account-header-avatar" aria-hidden="true">
+            {{ (auth.user.username || '?').charAt(0).toUpperCase() }}
+          </div>
+          <div class="account-header-meta">
+            <span class="account-header-name">{{ auth.user.username }}</span>
+            <span :class="['account-role-badge', auth.user.role === 'admin' ? 'is-admin' : 'is-user']">
+              {{ roleLabel }}
+            </span>
+          </div>
+        </div>
+      </template>
+
+      <template v-if="auth.user">
+        <div class="account-dialog-body">
+          <div class="account-card account-card--info">
+            <span class="account-card-label">注册时间</span>
+            <span class="account-card-value">{{ formatCreated(auth.user.created_at) }}</span>
+          </div>
+
+          <div class="account-card account-card--pwd">
+            <div class="account-card-head">
+              <el-icon class="account-card-icon"><Lock /></el-icon>
+              <span class="account-card-title">修改密码</span>
+            </div>
+            <el-form
+              label-position="top"
+              size="default"
+              class="account-pwd-form"
+              @submit.prevent="submitPasswordChange"
+            >
+              <el-form-item label="当前密码">
+                <el-input
+                  v-model="pwdForm.current"
+                  type="password"
+                  show-password
+                  autocomplete="current-password"
+                  placeholder="请输入当前登录密码"
+                />
+              </el-form-item>
+              <el-form-item label="新密码（至少 6 位）">
+                <el-input
+                  v-model="pwdForm.new1"
+                  type="password"
+                  show-password
+                  autocomplete="new-password"
+                  placeholder="新密码"
+                />
+              </el-form-item>
+              <el-form-item label="确认新密码">
+                <el-input
+                  v-model="pwdForm.new2"
+                  type="password"
+                  show-password
+                  autocomplete="new-password"
+                  placeholder="再次输入新密码"
+                />
+              </el-form-item>
+              <el-button type="primary" :loading="pwdSubmitting" native-type="submit" class="account-pwd-submit">
+                保存新密码
+              </el-button>
+            </el-form>
+          </div>
+        </div>
+      </template>
+
+      <template #footer>
+        <div class="account-dialog-footer">
+          <el-button plain class="account-footer-btn" @click="accountDialogVisible = false">关闭</el-button>
+          <el-button type="danger" plain class="account-footer-btn" @click="onLogoutFromPanel">
+            <el-icon><SwitchButton /></el-icon>
+            退出登录
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -269,12 +430,24 @@ const isMobile = computed(() => {
   display: none;
   align-items: center;
   gap: 10px;
-  max-width: 200px;
+  max-width: 220px;
   padding: 6px 12px 6px 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--gray-200);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.user-pill--clickable {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: var(--transition-fast);
+}
+
+.user-pill--clickable:hover {
+  border-color: var(--primary-400, #38bdf8);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15);
 }
 
 @media (min-width: 900px) {
@@ -431,5 +604,195 @@ const isMobile = computed(() => {
   .logo-en {
     display: none;
   }
+}
+
+</style>
+
+<!-- el-dialog teleport 到 body，需非 scoped 样式 -->
+<style lang="scss">
+.account-dialog.el-dialog {
+  border-radius: var(--card-radius-lg, 18px);
+  border: 1px solid var(--gray-200, #e2e8f0);
+  box-shadow: var(--shadow-lg, 0 12px 40px rgba(15, 23, 42, 0.12));
+  overflow: hidden;
+}
+
+.account-dialog .el-dialog__header {
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--gray-200, #e2e8f0);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, var(--bg-primary, #f8fafc) 100%);
+}
+
+.account-dialog .el-dialog__headerbtn {
+  top: 16px;
+  right: 16px;
+}
+
+.account-dialog .el-dialog__body {
+  padding: 16px 20px 8px;
+  background: var(--bg-primary, #f8fafc);
+}
+
+.account-dialog .el-dialog__footer {
+  padding: 12px 20px 20px;
+  background: var(--bg-primary, #f8fafc);
+  border-top: 1px solid var(--gray-200, #e2e8f0);
+}
+
+.account-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 44px 18px 20px;
+}
+
+.account-header-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary-gradient, linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%));
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(14, 165, 233, 0.35));
+}
+
+.account-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.account-header-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--gray-900, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-role-badge {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.account-role-badge.is-admin {
+  color: #0f172a;
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+.account-role-badge.is-user {
+  color: var(--gray-600, #475569);
+  background: rgba(255, 255, 255, 0.85);
+  border-color: var(--gray-200, #e2e8f0);
+}
+
+.account-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-card {
+  border-radius: var(--card-radius, 12px);
+  border: 1px solid var(--gray-200, #e2e8f0);
+  background: var(--bg-card, rgba(255, 255, 255, 0.92));
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.06));
+}
+
+.account-card--info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+}
+
+.account-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500, #64748b);
+}
+
+.account-card-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-900, #0f172a);
+}
+
+.account-card--pwd {
+  padding: 16px 16px 18px;
+}
+
+.account-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.account-card-icon {
+  font-size: 18px;
+  color: var(--primary-500, #0ea5e9);
+}
+
+.account-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gray-900, #0f172a);
+  letter-spacing: -0.01em;
+}
+
+.account-dialog .account-pwd-form {
+  max-width: 100%;
+}
+
+.account-dialog .account-pwd-form :deep(.el-form-item) {
+  margin-bottom: 14px;
+}
+
+.account-dialog .account-pwd-form :deep(.el-form-item__label) {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--gray-900, #0f172a);
+}
+
+.account-dialog .account-pwd-form :deep(.el-input__wrapper) {
+  border-radius: var(--button-radius, 12px);
+}
+
+.account-dialog .account-pwd-submit {
+  width: 100%;
+  margin-top: 6px;
+  height: 42px;
+  border-radius: var(--button-radius, 12px);
+  font-weight: 600;
+}
+
+.account-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.account-footer-btn {
+  border-radius: var(--button-radius, 12px);
+  font-weight: 600;
 }
 </style>

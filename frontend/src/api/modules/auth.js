@@ -12,6 +12,10 @@ export function getMeApi() {
   return request.get('/users/me')
 }
 
+export function changeOwnPasswordApi(body) {
+  return request.patch('/users/me/password', body)
+}
+
 export function listUsersApi() {
   return request.get('/admin/users')
 }

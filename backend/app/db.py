@@ -1,6 +1,7 @@
 import logging
 from typing import AsyncGenerator
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 
@@ -38,10 +39,15 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
             try:
                 logger.debug("数据库会话已创建，yield session")
                 yield session
+            except HTTPException:
+                await session.rollback()
+                raise
             except Exception as e:
                 logger.error(f"数据库会话异常: {e}", exc_info=True)
                 await session.rollback()
                 raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"创建数据库会话失败: {e}", exc_info=True)
         raise

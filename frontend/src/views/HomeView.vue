@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ChatDotRound,
-  Document,
   MapLocation,
   Collection,
   ArrowRight,
@@ -31,13 +30,33 @@ const goConsult = () => router.push('/chat')
 const goKnowledge = () => router.push('/knowledge')
 const goTo = (path) => router.push(path)
 
+/** 顶部「系统实时指标面板」：与上一版一致（含图数据库、模拟向量等） */
+const MOCK_VECTOR_DASHBOARD = {
+  total: 55,
+  dimensions: 768,
+  clusters: 5,
+  avgSimilarity: 0.684
+}
+
+const heroStats = ref([
+  { value: '--', label: '用户数量' },
+  { value: '--', label: '文档数量' },
+  { value: '--', label: '组件可用数' },
+  { value: '--', label: '图谱实体数' },
+  { value: '--', label: '图谱关系数' },
+  { value: '--', label: '总向量数' },
+  { value: '--', label: '向量维度' },
+  { value: '--', label: '聚类数' },
+  { value: '--', label: '平均相似度' },
+  { value: '7x24', label: '在线服务时长' }
+])
+
+/** 下方「运行指标」卡片：仅四项 */
 const stats = ref([
   { value: '--', label: '用户数量' },
   { value: '--', label: '文档数量' },
-  { value: '--', label: '图谱实体数' },
-  { value: '--', label: '图谱关系数' },
   { value: '--', label: '组件可用数' },
-  { value: '7x24', label: '在线服务时长' },
+  { value: '7x24', label: '在线服务时长' }
 ])
 
 const quickQuestions = [
@@ -83,7 +102,7 @@ const features = computed(() =>
 )
 
 const panelMetrics = computed(() => {
-  const entries = stats.value
+  const entries = heroStats.value
     .filter((item) => item.value !== '--' && item.label !== '在线服务时长')
     .map((item) => {
       const numeric = Number(String(item.value).replace(/,/g, ''))
@@ -100,6 +119,16 @@ const panelMetrics = computed(() => {
 function formatMetric(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '--'
   return Number(value).toLocaleString('zh-CN')
+}
+
+function vectorDashboardRows() {
+  const m = MOCK_VECTOR_DASHBOARD
+  return [
+    { value: formatMetric(m.total), label: '总向量数' },
+    { value: String(m.dimensions), label: '向量维度' },
+    { value: String(m.clusters), label: '聚类数' },
+    { value: m.avgSimilarity.toFixed(3), label: '平均相似度' }
+  ]
 }
 
 function firstNumericValue(obj, keys) {
@@ -121,11 +150,19 @@ async function loadRealStats() {
       if (res.status !== 'fulfilled') return acc
       return acc + (res.value?.data?.status === 'ok' ? 1 : 0)
     }, 0)
+    const healthLabel = `${availableComponentCount}/${totalComponentCount}`
+    heroStats.value = [
+      { value: '已登录', label: '访问状态' },
+      { value: '2', label: '可用组件数' },
+      { value: healthLabel, label: '组件健康数' },
+      ...vectorDashboardRows(),
+      { value: '7x24', label: '在线服务时长' }
+    ]
     stats.value = [
       { value: '已登录', label: '访问状态' },
       { value: '2', label: '可用组件数' },
-      { value: `${availableComponentCount}/${totalComponentCount}`, label: '组件健康数' },
-      { value: '7x24', label: '在线服务时长' },
+      { value: healthLabel, label: '组件健康数' },
+      { value: '7x24', label: '在线服务时长' }
     ]
     return
   }
@@ -163,12 +200,22 @@ async function loadRealStats() {
     return acc + (res.value?.data?.status === 'ok' ? 1 : 0)
   }, 0)
 
+  const compLabel = `${availableComponentCount}/${totalComponentCount}`
+
+  heroStats.value = [
+    { value: formatMetric(usersCount), label: '用户数量' },
+    { value: formatMetric(docsCount), label: '文档数量' },
+    { value: compLabel, label: '组件可用数' },
+    { value: formatMetric(entityCount), label: '图谱实体数' },
+    { value: formatMetric(relationCount), label: '图谱关系数' },
+    ...vectorDashboardRows(),
+    { value: '7x24', label: '在线服务时长' }
+  ]
+
   stats.value = [
     { value: formatMetric(usersCount), label: '用户数量' },
     { value: formatMetric(docsCount), label: '文档数量' },
-    { value: formatMetric(entityCount), label: '图谱实体数' },
-    { value: formatMetric(relationCount), label: '图谱关系数' },
-    { value: `${availableComponentCount}/${totalComponentCount}`, label: '组件可用数' },
+    { value: compLabel, label: '组件可用数' },
     { value: '7x24', label: '在线服务时长' }
   ]
 }
@@ -193,7 +240,7 @@ onMounted(() => {
             <span class="title-highlight">知识服务系统</span>
           </h1>
           <p class="hero-desc">
-            从检索到推理，从规范到问答，统一在一个现代化工作界面中完成。支持高并发问询与专业知识沉淀，兼顾效率和可信度。
+            从检索到推理，从规范到问答，统一在一个现代化工作界面中完成。支持智能问询与专业知识沉淀，兼顾效率和可信度。
           </p>
           <div class="hero-actions">
             <el-button type="primary" class="action-button primary" @click="goConsult">

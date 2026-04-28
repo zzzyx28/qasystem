@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { Search, Loading, MagicStick } from '@element-plus/icons-vue'
-import { knowledgeQuery as queryApi, nl2cypherGetVectors, mutiRetriever } from '@/api'
+import { knowledgeQuery as queryApi, mutiRetriever } from '@/api'
 import { ElMessage } from 'element-plus'
 
 // —— 知识库关键词检索 ——
@@ -32,7 +32,7 @@ const search = async () => {
   }
 }
 
-// —— 向量可视化（与 nl2cypher 组件库一致）——
+// —— 向量可视化：演示用模拟 PCA 分布（不请求后端）——
 const loadingVectors = ref(false)
 const vectors = ref([])
 const hoveredVector = ref(null)
@@ -57,65 +57,67 @@ const loadVectors = async () => {
   loadingVectors.value = true
   vectors.value = []
   hoveredVector.value = null
+  await new Promise((r) => setTimeout(r, 400))
+  vectors.value = generateMockVectors()
+  vectorStats.value = computeVectorStats()
+  await nextTick()
+  visualizeVectors()
+  ElMessage.success(`已加载演示向量 ${vectors.value.length} 条（模拟 PCA 聚类分布）`)
+  loadingVectors.value = false
+}
 
-  try {
-    const { data } = await nl2cypherGetVectors()
-
-    if (data?.vectors && Array.isArray(data.vectors) && data.vectors.length > 0) {
-      vectors.value = data.vectors
-      vectorStats.value = data.stats || null
-      await nextTick()
-      visualizeVectors()
-      ElMessage.success(`已加载 ${vectors.value.length} 个向量`)
-    } else {
-      vectors.value = generateMockVectors()
-      vectorStats.value = computeVectorStats()
-      await nextTick()
-      visualizeVectors()
-      ElMessage.success(`已加载模拟数据 (${vectors.value.length} 个向量)`)
-    }
-  } catch (err) {
-    console.error('加载向量数据失败:', err)
-    vectors.value = generateMockVectors()
-    vectorStats.value = computeVectorStats()
-    await nextTick()
-    visualizeVectors()
-    ElMessage.success(`已加载模拟数据 (${vectors.value.length} 个向量)`)
-  } finally {
-    loadingVectors.value = false
-  }
+/** 确定性噪声，保证每次刷新分布稳定、簇清晰 */
+function _demoNoise(i, salt = 0) {
+  const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453123
+  return x - Math.floor(x)
 }
 
 const generateMockVectors = () => {
-  const mockVectors = []
   const sampleTexts = [
-    '这是第一个文本片段，用于测试向量可视化功能。',
-    '自然语言处理是人工智能的重要分支。',
-    '向量数据库可以高效存储和检索文本嵌入。',
-    '深度学习模型能够理解语言的语义信息。',
-    'RAG架构结合了检索和生成的优势。',
-    '文本切片是构建知识库的基础步骤。',
-    '语义搜索可以找到最相关的文档。',
-    '向量化表示使得计算机能够理解文本。',
-    '可视化帮助理解高维数据的结构。',
-    '聚类算法可以发现数据中的自然分组。'
+    'CBTC 列车自动控制系统在高峰期的运行策略与间隔优化。',
+    '地铁制动系统故障时的应急处置流程与检修要点。',
+    '轨道交通信号系统互联互通测试规范摘要。',
+    '车辆段内调车作业安全规程与限速要求。',
+    '接触网停电区间内的行车组织与乘客疏散预案。',
+    '盾构隧道施工对邻近运营线路的沉降监测方法。',
+    '站台门与车门联动故障时的降级运行模式说明。',
+    '钢轨波磨检测周期及打磨验收标准（节选）。',
+    '换乘站大客流管控与三级预警响应机制。',
+    'FAO 全自动运行线路的远程复位与人工介入边界。'
   ]
 
-  for (let i = 0; i < 20; i++) {
-    mockVectors.push({
-      id: i,
-      embedding: new Array(384).fill(0).map(() => Math.random() * 2 - 1),
-      text: sampleTexts[i % sampleTexts.length] + ` 这是第${i + 1}个片段。`,
-      metadata: { source: 'mock', index: i },
-      dimension: 384,
-      position: {
-        x: (Math.random() - 0.5) * 1.6,
-        y: (Math.random() - 0.5) * 1.6
-      },
-      cluster: Math.floor(Math.random() * 3),
-      similarity: 0.5 + Math.random() * 0.3
-    })
-  }
+  const centers = [
+    { x: -0.82, y: 0.38 },
+    { x: 0.15, y: 0.88 },
+    { x: 0.92, y: 0.12 },
+    { x: 0.42, y: -0.78 },
+    { x: -0.48, y: -0.62 }
+  ]
+
+  const mockVectors = []
+  let idx = 0
+  const perCluster = 11
+  const dim = 768
+
+  centers.forEach((c, clusterId) => {
+    for (let j = 0; j < perCluster; j++) {
+      const spread = 0.11 + _demoNoise(idx) * 0.06
+      mockVectors.push({
+        id: idx,
+        text: `${sampleTexts[idx % sampleTexts.length]}（演示簇 ${clusterId + 1} · 片段 ${j + 1}）`,
+        metadata: { source: 'demo', cluster: clusterId },
+        dimension: dim,
+        position: {
+          x: c.x + (_demoNoise(idx, 1) - 0.5) * 2 * spread,
+          y: c.y + (_demoNoise(idx, 2) - 0.5) * 2 * spread
+        },
+        cluster: clusterId,
+        similarity: 0.52 + clusterId * 0.065 + _demoNoise(idx, 3) * 0.06
+      })
+      idx += 1
+    }
+  })
+
   return mockVectors
 }
 
@@ -296,43 +298,60 @@ const redrawVisualization = () => {
   if (vectors.value.length > 0) visualizeVectors()
 }
 
-watch(
-  () => [visualizationConfig.value.pointSize, visualizationConfig.value.showLabels],
-  redrawVisualization,
-  { deep: true }
-)
-
-// —— 多源数据检索 ——
+// —— 多源数据检索（图节点 VectorAddress → Milvus 片段，与后端 mutiRetriever 一致）——
 const loadingMuti = ref(false)
 const multiResults = ref([])
-const multiStats = ref(null)
+
+function normalizeMultiItem(item, index) {
+  if (item && (item.vector_address != null || item.vector_content != null)) {
+    return {
+      ...item,
+      vector_content: item.vector_content ?? item.content ?? '',
+      metadata: item.metadata ?? null
+    }
+  }
+  const text = item?.content ?? item?.vector_content ?? ''
+  const addr = item?.database_id ?? item?.vector_address ?? ''
+  return {
+    node_id: item?.node_id ?? addr ?? index + 1,
+    node_name: item?.node_name ?? item?.source ?? '',
+    labels: item?.labels ?? [],
+    vector_address: String(addr),
+    slice_number: item?.index ?? item?.slice_number ?? 0,
+    vector_content: text,
+    content_length: text.length,
+    database_id: item?.database_id,
+    source: item?.source ?? '',
+    metadata: item?.metadata ?? null,
+    milvus_hit: item?.milvus_hit
+  }
+}
 
 const loadMultiRetrieve = async () => {
   loadingMuti.value = true
   multiResults.value = []
-  multiStats.value = null
   try {
     const { data } = await mutiRetriever()
-    if (data) {
-      if (Array.isArray(data)) {
-        multiResults.value = data
-        multiStats.value = {
-          total_nodes: data.length,
-          nodes_with_vector_address: data.filter((item) => item.vector_address).length,
-          successful_retrievals: data.length,
-          success_rate: '100%'
-        }
-      }
-      ElMessage.success(`检索完成，共找到 ${multiResults.value.length} 条数据`)
-    } else {
-      ElMessage.error('检索失败，无数据返回')
+    const raw = Array.isArray(data) ? data : data?.data ?? []
+    if (!Array.isArray(raw)) {
+      ElMessage.error('检索失败，返回格式异常')
+      return
     }
+    const list = raw.map((row, i) => normalizeMultiItem(row, i))
+    multiResults.value = list
+    ElMessage.success(`检索完成，共 ${list.length} 条`)
   } catch (err) {
     ElMessage.error(err?.response?.data?.detail || err?.message || '检索失败')
   } finally {
     loadingMuti.value = false
   }
 }
+
+watch(
+  () => [visualizationConfig.value.pointSize, visualizationConfig.value.showLabels],
+  redrawVisualization,
+  { deep: true }
+)
 </script>
 
 <template>
@@ -388,12 +407,12 @@ const loadMultiRetrieve = async () => {
         <el-card class="panel-card" shadow="hover">
           <template #header>
             <span class="panel-title">向量可视化</span>
-            <el-tag type="info" size="small" class="panel-tag">PCA 降维</el-tag>
+            <el-tag type="info" size="small" class="panel-tag">演示 · PCA 风格分布</el-tag>
           </template>
           <div class="visualization-container">
             <div class="visualization-controls">
               <el-button type="primary" :loading="loadingVectors" @click="loadVectors">
-                加载向量数据
+                加载向量
               </el-button>
               <div class="control-group">
                 <div class="slider-with-label">
@@ -458,8 +477,8 @@ const loadMultiRetrieve = async () => {
               </div>
 
               <div v-else class="viz-empty">
-                <el-empty description="暂无向量数据">
-                  <p class="empty-hint">点击「加载向量数据」从向量服务拉取；失败时将展示模拟数据</p>
+                <el-empty description="尚未加载演示向量">
+                  <p class="empty-hint">点击「加载演示向量」查看模拟 PCA 聚类效果（轨道交通知识库示例片段）</p>
                 </el-empty>
               </div>
             </div>
@@ -537,15 +556,6 @@ const loadMultiRetrieve = async () => {
             </div>
 
             <template v-else-if="multiResults.length > 0">
-              <div v-if="multiStats" class="multi-stats-bar">
-                <div class="multi-stats-title">统计信息</div>
-                <div class="multi-stats-grid">
-                  <span>总节点数 <strong>{{ multiStats.total_nodes }}</strong></span>
-                  <span>有向量地址 <strong>{{ multiStats.nodes_with_vector_address }}</strong></span>
-                  <span>成功检索 <strong class="text-success">{{ multiStats.successful_retrievals }}</strong></span>
-                  <span>成功率 <strong class="text-warn">{{ multiStats.success_rate }}</strong></span>
-                </div>
-              </div>
               <div class="multi-result-box">
                 <p class="multi-result-heading">检索结果（共 {{ multiResults.length }} 条）</p>
                 <div class="multi-results-list">
@@ -558,7 +568,7 @@ const loadMultiRetrieve = async () => {
                       <span class="node-id">节点 {{ result.node_id }}</span>
                       <span v-if="result.node_name" class="node-name">({{ result.node_name }})</span>
                     </div>
-                    <div class="multi-field">
+                    <div v-if="(result.labels || []).length" class="multi-field">
                       <span class="field-label">标签</span>
                       <span class="field-value">{{ (result.labels || []).join(', ') }}</span>
                     </div>
@@ -569,6 +579,17 @@ const loadMultiRetrieve = async () => {
                     <div class="multi-field">
                       <span class="field-label">切片编号</span>
                       <span class="field-value strong">{{ result.slice_number }}</span>
+                    </div>
+                    <div v-if="result.source" class="multi-field">
+                      <span class="field-label">来源</span>
+                      <span class="field-value">{{ result.source }}</span>
+                    </div>
+                    <div
+                      v-if="result.metadata && Object.keys(result.metadata).length"
+                      class="multi-field block"
+                    >
+                      <span class="field-label">扩展字段</span>
+                      <pre class="meta-json">{{ JSON.stringify(result.metadata, null, 2) }}</pre>
                     </div>
                     <div class="multi-field block">
                       <span class="field-label">向量内容</span>
@@ -677,6 +698,175 @@ const loadMultiRetrieve = async () => {
 
 .extend-row {
   align-items: stretch;
+}
+
+/* 多源检索 */
+.multi-source {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.link-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: var(--button-radius);
+  font-size: 14px;
+  text-decoration: none;
+  border: 1px solid;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  &--primary {
+    color: var(--primary-500, #409eff);
+    border-color: var(--primary-500, #409eff);
+    &:hover {
+      background: rgba(64, 158, 255, 0.08);
+    }
+  }
+  &--success {
+    color: var(--el-color-success);
+    border-color: var(--el-color-success);
+    &:hover {
+      background: rgba(103, 194, 58, 0.08);
+    }
+  }
+}
+
+.multi-actions {
+  text-align: center;
+}
+
+.multi-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--gray-600);
+  p {
+    margin-top: 10px;
+  }
+}
+
+.multi-result-box {
+  margin-top: 4px;
+}
+
+.multi-result-heading {
+  font-weight: 600;
+  color: var(--gray-800);
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.multi-results-list {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.multi-result-item {
+  padding-bottom: 4px;
+}
+
+.multi-node-line {
+  margin-bottom: 10px;
+}
+
+.node-id {
+  color: var(--primary-500, #409eff);
+  font-weight: 600;
+}
+
+.node-name {
+  color: var(--gray-800);
+  margin-left: 8px;
+}
+
+.multi-field {
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  &.block {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.field-label {
+  color: var(--gray-600);
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.field-value {
+  color: var(--gray-800);
+  &.strong {
+    font-weight: 600;
+  }
+}
+
+.field-mono {
+  font-family: ui-monospace, 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--el-color-warning);
+  word-break: break-all;
+}
+
+.vector-content-box {
+  color: var(--gray-800);
+  background: var(--gray-50);
+  padding: 10px 12px;
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-500, #409eff);
+  margin-top: 6px;
+}
+
+.content-len {
+  color: var(--gray-500);
+  font-size: 12px;
+}
+
+.content-foot {
+  text-align: right;
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+.multi-divider {
+  margin: 16px 0;
+}
+
+.multi-placeholder {
+  padding: 24px 0;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meta-json {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  background: var(--gray-100);
+  border-radius: 6px;
+  overflow-x: auto;
+  max-height: 220px;
+  color: var(--gray-800);
+  border: 1px solid var(--gray-200);
 }
 
 /* 向量可视化 */
@@ -856,194 +1046,6 @@ const loadMultiRetrieve = async () => {
       letter-spacing: 0.3px;
     }
   }
-}
-
-/* 多源检索 */
-.multi-source {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.link-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: center;
-}
-
-.link-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  border-radius: var(--button-radius);
-  font-size: 14px;
-  text-decoration: none;
-  border: 1px solid;
-  transition:
-    background 0.15s,
-    color 0.15s;
-  &--primary {
-    color: var(--primary-500, #409eff);
-    border-color: var(--primary-500, #409eff);
-    &:hover {
-      background: rgba(64, 158, 255, 0.08);
-    }
-  }
-  &--success {
-    color: var(--el-color-success);
-    border-color: var(--el-color-success);
-    &:hover {
-      background: rgba(103, 194, 58, 0.08);
-    }
-  }
-}
-
-.multi-actions {
-  text-align: center;
-}
-
-.multi-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  color: var(--gray-600);
-  p {
-    margin-top: 10px;
-  }
-}
-
-.multi-stats-bar {
-  padding: 14px 16px;
-  background: var(--gray-50);
-  border-radius: var(--card-radius);
-  border: 1px solid var(--gray-200);
-}
-
-.multi-stats-title {
-  font-weight: 600;
-  color: var(--gray-900);
-  margin-bottom: 10px;
-  font-size: 14px;
-}
-
-.multi-stats-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-  font-size: 13px;
-  color: var(--gray-600);
-  strong {
-    color: var(--primary-500, #409eff);
-    margin-left: 4px;
-  }
-  .text-success {
-    color: var(--el-color-success);
-  }
-  .text-warn {
-    color: var(--el-color-warning);
-  }
-}
-
-.multi-result-box {
-  margin-top: 4px;
-}
-
-.multi-result-heading {
-  font-weight: 600;
-  color: var(--gray-800);
-  margin: 0 0 12px;
-  font-size: 14px;
-}
-
-.multi-results-list {
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.multi-result-item {
-  padding-bottom: 4px;
-}
-
-.multi-node-line {
-  margin-bottom: 10px;
-}
-
-.node-id {
-  color: var(--primary-500, #409eff);
-  font-weight: 600;
-}
-
-.node-name {
-  color: var(--gray-800);
-  margin-left: 8px;
-}
-
-.multi-field {
-  margin: 8px 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: baseline;
-  &.block {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-.field-label {
-  color: var(--gray-600);
-  min-width: 72px;
-  flex-shrink: 0;
-}
-
-.field-value {
-  color: var(--gray-800);
-  &.strong {
-    font-weight: 600;
-  }
-}
-
-.field-mono {
-  font-family: ui-monospace, 'Consolas', monospace;
-  font-size: 12px;
-  color: var(--el-color-warning);
-  word-break: break-all;
-}
-
-.vector-content-box {
-  color: var(--gray-800);
-  background: var(--gray-50);
-  padding: 10px 12px;
-  border-radius: 6px;
-  border-left: 3px solid var(--primary-500, #409eff);
-  margin-top: 6px;
-}
-
-.content-len {
-  color: var(--gray-500);
-  font-size: 12px;
-}
-
-.content-foot {
-  text-align: right;
-  font-size: 12px;
-  color: var(--gray-500);
-  margin-top: 4px;
-}
-
-.multi-divider {
-  margin: 16px 0;
-}
-
-.multi-placeholder {
-  padding: 24px 0;
-  min-height: 200px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 @media (max-width: 991px) {

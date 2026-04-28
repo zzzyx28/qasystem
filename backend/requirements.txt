@@ -52,6 +52,7 @@ docopt==0.6.2
 docstring_parser==0.17.0
 durationpy==0.10
 einops==0.8.2
+elasticsearch==8.13.2
 et_xmlfile==2.0.0
 executing==2.2.1
 Faker==40.8.0
@@ -239,6 +240,7 @@ python-dotenv==1.2.2
 python-multipart==0.0.22
 python-pptx==1.0.2
 pytz==2026.1.post1
+pytorch_lightning==2.6.1
 pyvis==0.3.2
 PyYAML==6.0.3
 pyzmq==27.1.0
