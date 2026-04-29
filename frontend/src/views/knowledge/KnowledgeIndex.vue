@@ -21,7 +21,7 @@ const shortcuts = [
   },
   {
     title: '知识检索',
-    desc: '面向知识库的全文与语义检索',
+    desc: '面向知识管理的全文与语义检索',
     icon: Search,
     path: '/knowledge/query',
     color: 'var(--success)'
@@ -38,10 +38,10 @@ const shortcuts = [
 
     <div class="home-inner">
       <h1 class="page-title">
-        <span class="title-highlight">知识库</span>
+        <span class="title-highlight">知识管理</span>
       </h1>
       <p class="page-desc">
-        本知识库为轨道交通行业知识服务系统提供文档与知识支撑，支持文档上传、管理与多维度检索。
+        本知识管理为轨道交通行业知识服务系统提供文档与知识支撑，支持文档上传、管理与多维度检索。
       </p>
 
       <div class="shortcut-grid">

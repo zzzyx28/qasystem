@@ -23,7 +23,7 @@ frontend/
 │       │   │   ├── manifest.js
 │       │   │   └── index.vue
 │       │   └── ...（其他组件）
-│       └── knowledge/   # 知识库（概览、文档管理、检索）
+│       └── knowledge/   # 知识管理（概览、文档管理、检索）
 ├── .env.example
 ├── Dockerfile.frontend  # 多阶段构建 + Nginx
 ├── nginx.conf           # Nginx 配置（静态 + /api 反向代理）
@@ -55,7 +55,7 @@ npm run preview
 ## 与后端接口对应
 
 - 问答：`POST /api/chat`
-- 知识库文档：`GET/POST/DELETE /api/knowledge/documents` 等
+- 知识管理文档：`GET/POST/DELETE /api/knowledge/documents` 等
 - 知识检索：`POST /api/knowledge/query`
 - 认证：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/users/me`
 

@@ -352,7 +352,7 @@ class EntityLinker:
         return linked_entities
 
     def _find_entity_in_knowledge_base(self, entity: str) -> str:
-        """在知识库中查找实体"""
+        """在知识管理中查找实体"""
         qids = set()
 
         #精确匹配

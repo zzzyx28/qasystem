@@ -260,7 +260,7 @@ const handlePick = async (file) => {
     try {
       const { data } = await checkDocumentNameExists(file.name)
       if (data?.exists) {
-        ElMessage.error(`文件「${file.name}」已在知识库中存在，请勿重复沉淀`)
+        ElMessage.error(`文件「${file.name}」已在知识管理中存在，请勿重复沉淀`)
         return
       }
     } catch {

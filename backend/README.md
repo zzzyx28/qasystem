@@ -3,7 +3,7 @@
 本目录为前端项目配套的 FastAPI 后端，实现：
 
 - 作为前端与 **Dify** 之间的中间层（对话与知识检索）
-- 本地 **知识库文档管理**（上传、列表、删除）
+- 本地 **知识管理文档管理**（上传、列表、删除）
 - **知识抽取组件**（进程内调用 `algorithm/uie`，按函数封装，无需单独启动抽取服务）
 - **知识图谱更新组件**（进程内调用 `algorithm/KGUpdate`，支持三元组批量添加/删除与图谱统计，配置见 `algorithm/KGUpdate/config.json`）
 - **向量转化存储与自然语言转 Cypher 组件**（进程内调用 `algorithm/NL_to_cypher`，根据自然语言问题与图谱 Schema 生成 Cypher，依赖 Ollama，见 `algorithm/NL_to_cypher`）
@@ -23,7 +23,7 @@ backend/
 │   ├── db.py            # 数据库引擎与会话
 │   ├── routers/         # 核心 API 路由
 │   │   ├── chat.py      # 对话接口（转发 Dify）
-│   │   ├── knowledge.py # 知识库：文档 CRUD、检索、同步 Dify
+│   │   ├── knowledge.py # 知识管理：文档 CRUD、检索、同步 Dify
 │   │   └── users.py     # 注册 / 登录 / 当前用户
 │   ├── modules/
 │   │   └── component/   # 组件管理（按组件拆分，每个组件 router + service）
@@ -110,11 +110,11 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - 问答接口：`POST /api/chat`
   - 请求体：`{ "message": string, "history": Array }`
   - 响应体：`{ "success": true, "reply": string, "conversation_id": string | null, "error": null }`
-- 知识库文档管理：
+- 知识管理文档管理：
   - `GET /api/knowledge/documents`
   - `POST /api/knowledge/documents`（`multipart/form-data`，字段名 `file`）
   - `DELETE /api/knowledge/documents/{id}`
-- 知识库检索：
+- 知识管理检索：
   - `POST /api/knowledge/query`，请求体：`{ "query": string }`
   - 返回结构满足前端对 `data.results | data.list | data.data` 的兼容读取方式。
 

@@ -381,7 +381,7 @@ async def sync_to_dify(
 
     return {
         "success": True,
-        "message": "开始同步到Dify知识库",
+        "message": "开始同步到Dify知识管理",
         "status": "syncing",
     }
 
@@ -432,7 +432,7 @@ async def knowledge_query(body: KnowledgeQueryRequest) -> dict[str, Any]:
             or ""
         )
         if answer_text:
-            results.append({"title": "知识库回答", "content": answer_text})
+            results.append({"title": "知识管理回答", "content": answer_text})
 
     return {"results": results}
 

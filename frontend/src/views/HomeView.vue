@@ -82,7 +82,7 @@ const allFeatures = [
     requiresAdmin: false
   },
   {
-    title: '知识库',
+    title: '知识管理',
     desc: '管理文档资产、执行知识检索与统一知识沉淀。',
     icon: Collection,
     path: '/knowledge',
@@ -249,7 +249,7 @@ onMounted(() => {
             </el-button>
             <el-button v-if="auth.isAdmin" class="action-button secondary" @click="goKnowledge">
               <el-icon><Monitor /></el-icon>
-              进入知识库管理台
+              进入知识管理管理台
             </el-button>
           </div>
         </div>

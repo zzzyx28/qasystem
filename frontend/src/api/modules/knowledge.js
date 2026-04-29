@@ -1,5 +1,5 @@
 /**
- * 知识库 - API
+ * 知识管理 - API
  * 文档管理、知识检索
  */
 import { request } from '../request'
@@ -9,7 +9,7 @@ export function getDocuments(params = {}) {
   return request.get('/knowledge/documents', { params })
 }
 
-/** 检查文档文件名是否已在知识库中存在（与上传接口查重规则一致） */
+/** 检查文档文件名是否已在知识管理中存在（与上传接口查重规则一致） */
 export function checkDocumentNameExists(name, requestConfig = {}) {
   return request.get('/knowledge/documents/exists', {
     params: { name },
@@ -42,7 +42,7 @@ export function downloadDocument(id) {
 }
 
 /**
- * 知识库检索
+ * 知识管理检索
  * @param {string} query - 检索关键词
  * @param {object} [options] - 其他参数
  */

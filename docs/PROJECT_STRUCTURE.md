@@ -41,7 +41,7 @@ frontend/
 │   ├── views/
 │   │   ├── HomeView.vue
 │   │   ├── ChatView.vue
-│   │   ├── knowledge/       # 知识库模块
+│   │   ├── knowledge/       # 知识管理模块
 │   │   └── component/       # 组件管理
 │   │       ├── layout.vue
 │   │       ├── index.vue
@@ -72,7 +72,7 @@ backend/
 │   ├── db.py
 │   ├── routers/
 │   │   ├── chat.py          # 对话（Dify 转发）
-│   │   ├── knowledge.py     # 知识库
+│   │   ├── knowledge.py     # 知识管理
 │   │   └── users.py         # 用户认证
 │   ├── modules/
 │   │   └── component/       # 组件管理（按组件拆分）

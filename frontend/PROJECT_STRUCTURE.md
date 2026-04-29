@@ -29,7 +29,7 @@ src/
 │   ├── request.js       # Axios 封装
 │   └── modules/
 │       ├── chat.js      # 智能问答
-│       ├── knowledge.js # 知识库：文档管理、检索
+│       ├── knowledge.js # 知识管理：文档管理、检索
 │       └── component/   # 组件管理相关 API
 │           ├── index.js
 │           └── knowledge-extract.js
@@ -39,7 +39,7 @@ src/
 └── views/               # 页面视图
     ├── HomeView.vue     # 首页
     ├── ChatView.vue     # 智能问答
-    ├── knowledge/       # 知识库模块
+    ├── knowledge/       # 知识管理模块
     │   ├── KnowledgeLayout.vue
     │   ├── KnowledgeIndex.vue
     │   ├── KnowledgeQuery.vue

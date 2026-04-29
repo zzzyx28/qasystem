@@ -48,14 +48,14 @@ const routes = [
     path: '/knowledge',
     name: 'knowledge',
     component: () => import('@/views/knowledge/KnowledgeLayout.vue'),
-    meta: { title: '知识库', requiresAuth: true, requiresAdmin: true },
+    meta: { title: '知识管理', requiresAuth: true, requiresAdmin: true },
     redirect: '/knowledge/index',
     children: [
       {
         path: 'index',
         name: 'knowledge-index',
         component: () => import('@/views/knowledge/KnowledgeIndex.vue'),
-        meta: { title: '知识库概览' }
+        meta: { title: '知识管理概览' }
       },
       {
         path: 'list',

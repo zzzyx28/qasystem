@@ -4,7 +4,7 @@ import { Search, Loading, MagicStick } from '@element-plus/icons-vue'
 import { knowledgeQuery as queryApi, mutiRetriever } from '@/api'
 import { ElMessage } from 'element-plus'
 
-// —— 知识库关键词检索 ——
+// —— 知识管理关键词检索 ——
 const queryText = ref('')
 const loading = ref(false)
 const results = ref([])
@@ -360,7 +360,7 @@ watch(
       <div class="search-box">
         <el-input
           v-model="queryText"
-          placeholder="输入关键词进行知识库检索"
+          placeholder="输入关键词进行知识管理检索"
           size="large"
           clearable
           @keyup.enter="search"
@@ -478,7 +478,7 @@ watch(
 
               <div v-else class="viz-empty">
                 <el-empty description="尚未加载演示向量">
-                  <p class="empty-hint">点击「加载演示向量」查看模拟 PCA 聚类效果（轨道交通知识库示例片段）</p>
+                  <p class="empty-hint">点击「加载演示向量」查看模拟 PCA 聚类效果（轨道交通知识管理示例片段）</p>
                 </el-empty>
               </div>
             </div>

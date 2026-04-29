@@ -38,7 +38,7 @@ async function onSubmit() {
   <AuthPageShell
     eyebrow="欢迎回来"
     title="登录账户"
-    subtitle="登录后可使用智能问答；管理员还可使用知识库、组件管理与用户管理。"
+    subtitle="登录后可使用智能问答；管理员还可使用知识管理、组件管理与用户管理。"
   >
     <el-form class="auth-form" label-position="top" size="large" @submit.prevent="onSubmit">
       <el-form-item label="用户名">

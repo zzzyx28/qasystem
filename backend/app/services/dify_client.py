@@ -195,14 +195,14 @@ class DifyClient:
                 resp.raise_for_status()
                 return resp.json()
         except httpx.TimeoutException as e:
-            logger.error(f"Dify知识库API请求超时: {e}")
-            raise ValueError("Dify知识库查询超时，请稍后重试") from e
+            logger.error(f"Dify知识管理API请求超时: {e}")
+            raise ValueError("Dify知识管理查询超时，请稍后重试") from e
         except httpx.HTTPStatusError as e:
-            logger.error(f"Dify知识库API HTTP错误: {e.response.status_code} - {e.response.text[:200]}")
-            raise ValueError(f"Dify知识库API错误: {e.response.status_code}") from e
+            logger.error(f"Dify知识管理API HTTP错误: {e.response.status_code} - {e.response.text[:200]}")
+            raise ValueError(f"Dify知识管理API错误: {e.response.status_code}") from e
         except httpx.RequestError as e:
-            logger.error(f"Dify知识库API请求错误: {e}")
-            raise ValueError(f"无法连接到Dify知识库API: {str(e)}") from e
+            logger.error(f"Dify知识管理API请求错误: {e}")
+            raise ValueError(f"无法连接到Dify知识管理API: {str(e)}") from e
 
 
 dify_client = DifyClient()
