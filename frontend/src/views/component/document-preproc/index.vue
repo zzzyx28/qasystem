@@ -859,7 +859,7 @@ const renderLaTeX = (text) => {
 
     <div class="preproc-inner">
       <h1 class="page-title">
-        <span class="title-highlight">多源数据解析组件库</span>
+        <span class="title-highlight">多源数据解析组件</span>
       </h1>
       <div class="component-intro">
         <p class="intro-title">组件功能说明</p>

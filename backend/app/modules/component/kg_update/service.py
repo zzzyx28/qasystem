@@ -122,7 +122,20 @@ def get_statistics() -> dict[str, Any]:
 def calculate_confidence(triples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     predictor = _get_predictor()
     predictions = predictor.predict_batch(triples)
-    return predictions
+    # predictor 输出仅包含 confidence/component_scores/best_path，
+    # 这里补齐原始三元组字段以匹配 API 响应模型。
+    merged_results: list[dict[str, Any]] = []
+    for triple, pred in zip(triples, predictions):
+        merged_results.append(
+            {
+                "subject": triple.get("subject"),
+                "predicate": triple.get("predicate"),
+                "object": triple.get("object"),
+                "confidence": pred.get("confidence"),
+                "component_scores": pred.get("component_scores", {}),
+            }
+        )
+    return merged_results
 
 
 def process_schema_output(data: dict, confidence_threshold: float = 0.7) -> dict[str, Any]:

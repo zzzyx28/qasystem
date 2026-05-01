@@ -371,7 +371,7 @@ onMounted(() => {
       <div class="header-left"></div>
       <div class="header-right">
         <h1 class="page-title">
-          <span class="title-highlight">文本向量化与切片组件库</span>
+          <span class="title-highlight">文本向量化与切片组件</span>
         </h1>
         <p class="page-desc">
           将文本转为向量存储、不同逻辑下的文本切片、自然语言转Cypher。
