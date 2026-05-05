@@ -29,7 +29,7 @@ export {
   knowledgeQuery
 } from './modules/knowledge'
 
-// 组件管理：知识抽取、知识图谱更新、自然语言转 Cypher 等
+// 组件管理：知识抽取、知识图谱更新、文本切分等
 export { knowledgeExtract, extractHealthCheck, storeGraphToNeo4j, parseChunkedJsonExtract } from './modules/component'
 export {
   kgUpdateHealthCheck,
@@ -40,8 +40,14 @@ export {
   processSchemaOutput,   
   addFromComputed        
 } from './modules/component/kg-update'
-export { nl2cypherHealthCheck, nl2cypherGenerate } from './modules/component'
-export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './modules/component'
+export { textSplitHealthCheck } from './modules/component'
+export {
+  intentRecognitionHealthCheck,
+  intentRecognitionRecognize,
+  intentRecognitionDeepRecognize,
+  intentRecognitionGetPlan,
+  intentRecognitionGetTools
+} from './modules/component'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize, answerGenerationQueryGraph } from './modules/component'
 export { documentPreprocHealthCheck, documentPreprocConvert, documentPreprocConvertToPdf, getAvailableModels } from './modules/component'
 // -----------------------------------------------------------------------------
@@ -52,8 +58,8 @@ export { documentPreprocHealthCheck, documentPreprocConvert, documentPreprocConv
  * 切片：递归字符
  * @param {string} text
  */
-export function nl2cypherSplitCharacter(text) {
-  return request.post('/component/nl2cypher/split/character',
+export function textSplitCharacter(text) {
+  return request.post('/component/text-split/split/character',
     { text: text },
     { timeout: 120000 }
   )
@@ -63,36 +69,29 @@ export function nl2cypherSplitCharacter(text) {
  * 切片：递归字符
  * @param {string} text
  */
-export function nl2cypherSplitRecursive(text) {
-  return request.post('/component/nl2cypher/split/recursive', { text: text }, { timeout: 120000 })
+export function textSplitRecursive(text) {
+  return request.post('/component/text-split/split/recursive', { text: text }, { timeout: 120000 })
 }
 
 /**
  * 切片：Markdown
  * @param {string} text
  */
-export function nl2cypherSplitMarkdown(text, requestConfig = {}) {
-  return request.post('/component/nl2cypher/split/markdown', { text: text }, { timeout: 120000, ...requestConfig })
+export function textSplitMarkdown(text, requestConfig = {}) {
+  return request.post('/component/text-split/split/markdown', { text: text }, { timeout: 120000, ...requestConfig })
 }
 
 /**
  * 切片：Python 代码
  * @param {string} text
  */
-export function nl2cypherSplitPython(text) {
-  return request.post('/component/nl2cypher/split/python', { text: text }, { timeout: 120000 })
-}
-
-export function nl2cypherText2vector(text, fileName = '') {
-  return request.post('/component/nl2cypher/text2vector', { 
-    text: text,
-    source: fileName  // 添加文件名作为source
-  }, { timeout: 120000 })
+export function textSplitPython(text) {
+  return request.post('/component/text-split/split/python', { text: text }, { timeout: 120000 })
 }
 
 export const mutiRetriever = () => {
   return request({
-    url: '/component/nl2cypher/mutiRetriever',
+    url: '/component/text-split/mutiRetriever',
     method: 'get'
   })
 }

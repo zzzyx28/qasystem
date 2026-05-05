@@ -1,32 +1,41 @@
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Document, Upload, Search } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
 
-const shortcuts = [
+const allShortcuts = [
   {
     title: '知识沉淀',
     desc: '上传文档，完成预处理、切分、抽取并更新知识图谱',
     icon: Upload,
     path: '/knowledge/upload',
-    color: 'var(--primary-500)'
+    color: 'var(--primary-500)',
+    requiresAdmin: true
   },
   {
     title: '文档列表',
     desc: '查看、管理已上传文档',
     icon: Document,
     path: '/knowledge/list',
-    color: 'var(--primary-500)'
+    color: 'var(--primary-500)',
+    requiresAdmin: true
   },
   {
-    title: '知识检索',
-    desc: '面向知识管理的全文与语义检索',
+    title: '数据库管理',
+    desc: '统一访问向量数据库与图数据库管理台',
     icon: Search,
     path: '/knowledge/query',
     color: 'var(--success)'
   }
 ]
+
+const shortcuts = computed(() =>
+  allShortcuts.filter((item) => !item.requiresAdmin || auth.isAdmin)
+)
 </script>
 
 <template>

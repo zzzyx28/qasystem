@@ -101,7 +101,7 @@ async def admin_update_user(
         if user.role == ROLE_ADMIN and body.role == ROLE_USER:
             admins = await count_admins(db)
             if admins <= 1:
-                raise HTTPException(status_code=400, detail="不能移除系统唯一的管理员")
+                raise HTTPException(status_code=400, detail="不能移除系统唯一的知识管理员")
         user.role = body.role
 
     if body.password is not None:
@@ -134,7 +134,7 @@ async def admin_delete_user(
     if user.role == ROLE_ADMIN:
         admins = await count_admins(db)
         if admins <= 1:
-            raise HTTPException(status_code=400, detail="不能删除系统唯一的管理员")
+            raise HTTPException(status_code=400, detail="不能删除系统唯一的知识管理员")
 
     await db.execute(delete(User).where(User.id == user_id))
     await db.commit()

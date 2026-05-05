@@ -1,6 +1,6 @@
 /**
  * 知识管理 - API
- * 文档管理、知识检索
+ * 文档管理、数据库管理
  */
 import { request } from '../request'
 
@@ -42,7 +42,7 @@ export function downloadDocument(id) {
 }
 
 /**
- * 知识管理检索
+ * 数据库管理检索
  * @param {string} query - 检索关键词
  * @param {object} [options] - 其他参数
  */

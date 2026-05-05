@@ -1,17 +1,20 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, Link, Refresh } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const iframeLoading = ref(true)
 const iframeError = ref(false)
 const iframeKey = ref(0)
 const iframeSrc = ref('')
 const difyWorkspaceUrl = ref('')
+const canOpenDifyWorkspace = computed(() => auth.isAdmin && Boolean(difyWorkspaceUrl.value))
 
 const onLoad = () => {
   iframeLoading.value = false
@@ -23,7 +26,15 @@ const onError = () => {
   iframeError.value = true
 }
 
-const openDify = () => difyWorkspaceUrl.value && window.open(difyWorkspaceUrl.value, '_blank', 'noopener,noreferrer')
+const openDify = () => {
+  if (!auth.isAdmin) {
+    ElMessage.warning('您没有权限访问 Dify 工作台')
+    return
+  }
+  if (difyWorkspaceUrl.value) {
+    window.open(difyWorkspaceUrl.value, '_blank', 'noopener,noreferrer')
+  }
+}
 
 const reloadIframe = () => {
   iframeLoading.value = true
@@ -59,7 +70,7 @@ onMounted(() => {
           <p>Dify 嵌入模式</p>
         </div>
         <div class="toolbar-actions">
-          <el-button plain :disabled="!difyWorkspaceUrl" @click="openDify">
+          <el-button v-if="auth.isAdmin" plain :disabled="!canOpenDifyWorkspace" @click="openDify">
             <el-icon><Link /></el-icon>
             打开 Dify 工作台
           </el-button>

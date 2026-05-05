@@ -432,7 +432,7 @@ const openNeo4jBrowser = () => {
       </div>
 
       <div class="extract-type-row">
-        <span class="extract-type-label">抽取类型</span>
+        <span class="extract-type-label">知识类型</span>
         <el-checkbox-group v-model="selectedExtractTypes" :disabled="pipelineRunning">
           <el-checkbox
             v-for="opt in extractTypeOptions"

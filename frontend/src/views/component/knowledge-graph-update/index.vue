@@ -1,10 +1,8 @@
 <script setup>
-import { ref, reactive, onMounted, watch, nextTick, onUnmounted } from 'vue'
-import { Plus, Delete, DataLine, Link, Warning, MagicStick, Upload, Document } from '@element-plus/icons-vue'
+import { ref, onMounted } from 'vue'
+import { Delete, DataLine, Link, Document } from '@element-plus/icons-vue'
 import { kgUpdateHealthCheck, kgUpdateAdd, kgUpdateDelete, kgUpdateStatistics, kgCalculateConfidence, processSchemaOutput, addFromComputed } from '@/api'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
-import { Network } from 'vis-network'
 
 const loadingAdd = ref(false)
 const loadingDelete = ref(false)
@@ -31,9 +29,6 @@ const statistics = ref(null)
 
 const NEO4J_BROWSER_URL = 'http://localhost:7474/browser/'
 
-// 侧边栏活动项
-const activeMenu = ref('confidence')
-
 // 置信度流程：进度条状态
 const currentStep = ref(0)
 const resetSteps = () => { currentStep.value = 0 }
@@ -51,17 +46,6 @@ const computedFullRelations = ref([])
 const computedPredictions = ref([])
 const computedHighRelations = ref([])
 
-// 冲突检测与修复
-const turtleInput = ref('')
-const conflictGroups = ref([])
-const activeGroupIndex = ref(null)
-const loadingDetect = ref(false)
-const loadingRepair = ref(false)
-const visContainer = ref(null)
-let networkInstance = null
-const conflictStep = ref(0)
-// vis-network instance (destroyed/recreated when rendering the graph)
-
 // 健康检查
 const checkHealth = async () => {
   healthStatus.value = null
@@ -72,7 +56,7 @@ const checkHealth = async () => {
       healthStatus.value = 'ok'
     } else {
       healthStatus.value = 'error'
-      healthDetail.value = data?.detail || '知识图谱更新模块未就绪'
+      healthDetail.value = data?.detail || '图谱更新模块未就绪'
     }
   } catch {
     healthStatus.value = 'error'
@@ -294,255 +278,8 @@ const clearSchemaInput = () => {
   computedHighRelations.value = []
 }
 
-// ========== 冲突检测与修复 ==========
-const handleFileUpload = (file) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    turtleInput.value = e.target.result
-    ElMessage.success('文件加载成功')
-  }
-  reader.readAsText(file.raw)
-}
-
-const handleConflictDetect = async () => {
-  if (!turtleInput.value.trim()) return ElMessage.warning('请先输入 Turtle 数据')
-  loadingDetect.value = true
-  conflictGroups.value = []
-  conflictStep.value = 1
-  try {
-    const { data } = await axios.post('/api/conflict/detect', {
-      insert_ttl: turtleInput.value,
-      delete_ttl: ''
-    })
-    if (data.success) {
-      const raw = data.conflicts || [];
-        conflictGroups.value = raw.map((c) => ({
-          ...c,
-          // 🚨 核心改动：显示的时候，直接脱壳！
-          subject: cleanId(c.subject), 
-          predicate: cleanId(c.predicate),
-          selectedResolution: c.selectedResolution || 'overwrite',
-          customValue: c.customValue || ''
-        }));
-      if (conflictGroups.value.length > 0) {
-        const msg = data.message || `冲突检测完成：发现 ${conflictGroups.value.length} 项违规数据。`
-        activeGroupIndex.value = 0
-        conflictStep.value = 2
-        ElMessage({ message: msg, type: 'warning', duration: 5000, showClose: true })
-      } else {
-        activeGroupIndex.value = null
-        conflictStep.value = 5
-        ElMessage.success('冲突检测完成：未发现任何冲突，数据已自动同步！')
-      }
-    }
-  } catch (err) {
-    console.error('检测接口报错:', err)
-    conflictStep.value = 0
-    ElMessage.error(err?.response?.data?.detail || '检测失败，请检查后端服务')
-  } finally {
-    loadingDetect.value = false
-  }
-}
-
-const handleSingleRepair = async () => {
-  if (activeGroupIndex.value === null) return
-  const current = conflictGroups.value[activeGroupIndex.value]
-  loadingRepair.value = true
-  conflictStep.value = 3
-  try {
-    const payload = {
-      actions: [{
-        subject: current.subject,
-        predicate: current.predicate,
-        operation: current.operation || 'add',
-        action_type: current.selectedResolution,
-        value: current.selectedResolution === 'manual' ? current.customValue : current.newValue
-      }]
-    }
-    const { data } = await axios.post('/api/conflict/repair', payload)
-    if (data.success) {
-      ElMessage.success(`[${current.subject}] 修复成功，已同步至数据库`)
-      conflictGroups.value.splice(activeGroupIndex.value, 1)
-      if (conflictGroups.value.length > 0) {
-        activeGroupIndex.value = 0
-        conflictStep.value = 2
-      } else {
-        activeGroupIndex.value = null
-        conflictStep.value = 5
-      }
-    }
-  } catch (err) {
-    console.error('修复接口报错:', err)
-    conflictStep.value = 2
-    ElMessage.error(err?.response?.data?.detail || '修复执行失败')
-  } finally {
-    loadingRepair.value = false
-  }
-}
-const cleanId = (str) => {
-  if (!str) return '';
-  // 过滤掉尖括号，取最后一段
-  return str.replace(/[<>]/g, '').split('/').pop();
-};
-watch(conflictStep, async (newVal) => {
-  if (newVal === 2 || newVal === 3) {
-    await nextTick()
-    renderConflictGraph()
-  }
-})
-
-const renderConflictGraph = () => {
-  if (!visContainer.value) return
-  if (networkInstance) {
-    networkInstance.destroy()
-    networkInstance = null
-  }
-  const nodes = []
-  const edges = []
-  
-  // 🚨 关键修复 1：用一个 Set 记录已经画过的主语，防止红点重复画导致崩溃
-  const addedSubjects = new Set()
-
-  // 🚨 关键修复 2：加上 index 参数，给后续的连线和方块加上唯一编号
-  conflictGroups.value.forEach((conflict, index) => {
-    
-    // 1. 画主语节点（中心红点）
-    if (!addedSubjects.has(conflict.subject)) {
-      nodes.push({
-        id: conflict.subject, // 这里不用加 index，因为它是中心点
-        label: `${conflict.subject}\n(违规主体)`,
-        color: { background: '#fef0f0', border: '#f56c6c' },
-        shape: 'dot',
-        size: 35,
-        font: { multi: 'md', color: '#f56c6c', weight: 'bold' }
-      })
-      addedSubjects.add(conflict.subject)
-    }
-
-    // 2. 画旧值节点（绿色方块）
-    if (conflict.oldValue !== '无记录') {
-      // 🚨 关键修复 3：ID 加上 _${index}，确保绝对唯一
-      const oldNodeId = `old_${conflict.subject}_${index}`
-      nodes.push({
-        id: oldNodeId,
-        label: `库内原值:\n${conflict.oldValue}`,
-        color: { background: '#f0f9eb', border: '#67c23a' },
-        shape: 'box',
-        size: 20
-      })
-      // 💡 顺便优化：连线上显示具体的属性名（比如 speed），图表更好看
-      const edgeLabel = conflict.predicate ? conflict.predicate : '当前属性'
-      edges.push({ from: conflict.subject, to: oldNodeId, label: edgeLabel, color: '#67c23a' })
-    }
-
-    // 3. 画新值节点（橙色方块）
-    const newNodeId = `new_${conflict.subject}_${index}` // 🚨 同理加 index
-    nodes.push({
-      id: newNodeId,
-      label: `拟输入值:\n${conflict.newValue}`,
-      color: { background: '#fdf6ec', border: '#e6a23c' },
-      shape: 'box',
-      size: 20
-    })
-    const newEdgeLabel = conflict.predicate ? `${conflict.predicate} 冲突` : '冲突更新'
-    edges.push({ from: conflict.subject, to: newNodeId, label: newEdgeLabel, dashes: true, color: '#e6a23c' })
-  })
-
-  // --- 下面是实例化和点击事件 ---
-  const options = {
-    physics: {
-      enabled: true,
-      barnesHut: { gravitationalConstant: -3000, springLength: 150 }
-    },
-    interaction: { hover: true, tooltipDelay: 200 }
-  }
-  
-  networkInstance = new Network(visContainer.value, { nodes, edges }, options)
-  
-  // 🚨 关键修复 4：因为前面 ID 变了，这里的点击匹配逻辑也要微微调整
-  networkInstance.on('click', (params) => {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0]
-      // 用正则把前缀 old_ / new_ 和后缀 _0 去掉，还原出真正的 subjectId
-      let subjectId = nodeId
-      if (nodeId.startsWith('old_') || nodeId.startsWith('new_')) {
-         subjectId = nodeId.replace(/^(old|new)_/, '').replace(/_\d+$/, '')
-      }
-      
-      const index = conflictGroups.value.findIndex((c) => c.subject === subjectId)
-      if (index !== -1) activeGroupIndex.value = index
-    }
-  })
-}
-
-const handleApplyRepair = async () => {
-  const index = activeGroupIndex.value
-  if (index === null || !conflictGroups.value[index]) return
-  const current = conflictGroups.value[index]
-  const resolution = current.selectedResolution
-  let finalValue = ''
-  if (resolution === 'manual') {
-    if (!current.customValue) return ElMessage.warning('请输入人工修正值')
-    finalValue = current.customValue
-  } else if (resolution === 'overwrite') {
-    finalValue = current.newValue
-  } else if (resolution === 'keep') {
-    return handleFinishOrNext()
-  }
-  const repairAction = {
-    subject: current.subject.replace(/^ex:/, ''),
-    predicate: current.predicate.replace(/^ex:/, ''),
-    value: finalValue,
-    operation: 'add'
-  }
-  try {
-    const { data } = await axios.post('/api/conflict/repair', { actions: [repairAction] })
-    if (data.success) {
-      ElMessage.success(`修正成功: ${finalValue}`)
-      handleFinishOrNext()
-    }
-  } catch (err) {
-    console.error('修复失败:', err)
-    ElMessage.error(err?.response?.data?.detail || '数据库写入异常')
-  }
-}
-
-const proceedToNext = () => {
-  if (activeGroupIndex.value < conflictGroups.value.length - 1) {
-    activeGroupIndex.value += 1
-  }
-}
-
-const handleFinishOrNext = () => {
-  if (activeGroupIndex.value === conflictGroups.value.length - 1) {
-    conflictStep.value = 5
-    ElMessage.success('所有冲突已处理完毕！')
-  } else {
-    proceedToNext()
-  }
-}
-
-const resetConflictFlow = () => {
-  turtleInput.value = ''
-  conflictStep.value = 0
-  conflictGroups.value = []
-  activeGroupIndex.value = null
-}
-
-const clearConflictInput = () => {
-  turtleInput.value = ''
-  conflictStep.value = 0
-}
-
-const onConflictInput = () => {
-  conflictStep.value = 0
-}
-
 onMounted(() => {
   checkHealth()
-})
-onUnmounted(() => {
-  if (networkInstance) networkInstance.destroy()
 })
 </script>
 
@@ -555,7 +292,7 @@ onUnmounted(() => {
 
     <div class="kg-update-inner">
       <h1 class="page-title">
-        <span class="title-highlight">知识图谱更新</span>
+        <span class="title-highlight">图谱更新组件</span>
       </h1>
       <p class="page-desc">
         批量添加或删除 Neo4j 三元组；可查看图谱统计。
@@ -571,19 +308,9 @@ onUnmounted(() => {
         <el-button link type="primary" size="small" :icon="Link" @click="openNeo4jBrowser">查看图谱</el-button>
       </div>
 
-      <!-- 侧边栏布局 -->
-      <div class="content-layout">
-        <el-menu :default-active="activeMenu" class="sidebar-menu" @select="(key) => activeMenu = key">
-          <el-menu-item index="confidence">
-            <span>置信度计算与更新</span>
-          </el-menu-item>
-          <el-menu-item index="conflict">
-            <span>冲突检测与修复</span>
-          </el-menu-item>
-        </el-menu>
-        <div class="main-content">
-          <!-- 置信度计算与更新内容 -->
-          <div v-if="activeMenu === 'confidence'">
+      <div class="main-content">
+        <!-- 置信度计算与更新内容 -->
+        <div>
             <!-- 算法介绍卡片 -->
             <el-card class="algorithm-intro-card" shadow="hover">
               <template #header>
@@ -798,191 +525,6 @@ onUnmounted(() => {
                 <pre v-if="deleteResult.statistics" class="result-json">{{ JSON.stringify(deleteResult.statistics, null, 2) }}</pre>
               </div>
             </el-card>
-          </div>
-
-          <!-- 冲突检测与修复内容 -->
-          <div v-else-if="activeMenu === 'conflict'" class="conflict-split-view">
-            <el-card shadow="never" style="margin-bottom: 20px; border: none; background: transparent;">
-
-              <el-card class="algorithm-annotation-card" shadow="never">
-                <div class="card-header-wrapper">
-                  <span class="header-icon">🧠</span>
-                  <span class="header-title">冲突推演算法：基于 SHACL 的串行逻辑推演模型</span>
-                </div>
-
-                <p class="main-description">
-                  本系统采用“先约束过滤、后逻辑求解”的漏斗式架构定位图谱冲突，融合三大核心步骤：
-                </p>
-
-                <el-row :gutter="40" class="features-row">
-                  <el-col :span="8">
-                    <div class="feature-block">
-                      <div class="feature-icon">
-                      </div>
-                      <div class="feature-text">
-                        <div class="feature-title">查找最小冲突子图</div>
-                        <div class="feature-desc">利用约束规则，从全量图谱中提取最小候选子图</div>
-                      </div>
-                    </div>
-                  </el-col>
-
-                  <el-col :span="8">
-                    <div class="feature-block">
-                      <div class="feature-icon">
-                      </div>
-                      <div class="feature-text">
-                        <div class="feature-title">Clingo 精准求解</div>
-                        <div class="feature-desc">在剪枝后的子图空间内，根据约束规则计算冲突根因</div>
-                      </div>
-                    </div>
-                  </el-col>
-
-                  <el-col :span="8">
-                    <div class="feature-block">
-                      <div class="feature-icon">
-                      </div>
-                      <div class="feature-text">
-                        <div class="feature-title">修复三元组</div>
-                        <div class="feature-desc">根据逻辑推演结果，选择最优方案</div>
-                      </div>
-                    </div>
-                  </el-col>
-                </el-row>
-              </el-card>
-              <el-steps :active="conflictStep" finish-status="success" align-center>
-                <el-step title="数据输入" />
-                <el-step title="冲突检测" />
-                <el-step title="展示与修复" />
-                <el-step title="正在修复" />
-                <el-step title="更新完成" />
-              </el-steps>
-            </el-card>
-
-            <div class="conflict-wrapper">
-              <el-card class="form-card" shadow="hover" v-show="conflictStep < 2">
-                <template #header>
-                  <div class="card-header-flex">
-                    <span>RDF Turtle 或 JSON 数据输入</span>
-                    <el-upload action="#" :auto-upload="false" :show-file-list="false" @change="handleFileUpload">
-                      <el-button type="primary" link :icon="Link">请输入 Turtle 或 JSON 数据</el-button>
-                    </el-upload>
-                  </div>
-                </template>
-                <el-input
-                  v-model="turtleInput"
-                  type="textarea"
-                  :rows="8"
-                  placeholder="@prefix ex: <http://example.org/> ... "
-                  class="turtle-editor"
-                  @input="onConflictInput"
-                />
-                <div style="margin-top: 12px; display: flex; gap: 10px;">
-                  <el-button type="primary" :loading="loadingDetect" @click="handleConflictDetect">
-                    开始冲突检测
-                  </el-button>
-                  <el-button @click="clearConflictInput">清空</el-button>
-                </div>
-              </el-card>
-
-              <el-card class="graph-card" shadow="hover" v-show="conflictStep === 2 || conflictStep === 3" style="margin-bottom: 20px;">
-                <template #header>
-                  <div class="card-header-flex">
-                    <span style="font-weight: bold; color: #f56c6c;">
-                      <el-icon><Link /></el-icon> 最小冲突子图动态展示
-                    </span>
-                    <el-button type="primary" link @click="renderConflictGraph">重置布局</el-button>
-                  </div>
-                </template>
-                <div ref="visContainer" style="height: 350px; background: #ffffff; border-radius: 8px;"></div>
-              </el-card>
-
-              <el-row :gutter="20" v-show="(conflictStep === 2 || conflictStep === 3) && conflictGroups.length > 0" style="margin-top: 20px;">
-                <el-col :span="12">
-                  <h3 class="sub-title"><el-icon><Warning /></el-icon> 发现冲突项</h3>
-                  <div class="scroll-container">
-                    <el-card
-                      v-for="(group, index) in conflictGroups"
-                      :key="index"
-                      class="conflict-item-card"
-                      :class="{ 'is-active': activeGroupIndex === index }"
-                      @click="activeGroupIndex = index">
-                      <div class="conflict-header">
-                        <el-tag type="danger" size="small">{{ group.conflictType }}</el-tag>
-                        <span class="subject-text">{{ group.subjectName || group.subject }}</span>
-                      </div>
-                      <p class="predicate-text">
-                        <span v-if="group.conflictType && group.conflictType.includes('关系')">关系：</span>
-                        <span v-else-if="group.conflictType && group.conflictType.includes('标签')">标签：</span>
-                        <span v-else>属性：</span>
-                        
-                        <code>{{ group.predicateName || group.predicate }}</code>
-                      </p>
-                      <div class="comparison-grid">
-                        <div class="val-box old">
-                          <span class="label">数据库现有:</span>
-                          <span class="value">{{ group.oldValue }}</span>
-                        </div>
-                        <div class="val-box new">
-                          <span class="label">本次输入:</span>
-                          <span class="value">{{ group.newValue }}</span>
-                        </div>
-                      </div>
-                    </el-card>
-                  </div>
-                </el-col>
-
-                <el-col :span="12">
-                  <h3 class="sub-title"><el-icon><MagicStick /></el-icon> 修复建议</h3>
-                  <el-card v-if="activeGroupIndex !== null" shadow="never" class="repair-card">
-                    <div class="repair-info">
-                      <h4>针对 {{ conflictGroups[activeGroupIndex]?.subject }} 的方案</h4>
-                      <el-radio-group v-model="conflictGroups[activeGroupIndex].selectedResolution">
-                        <el-radio label="overwrite" border class="repair-radio">
-                          <strong>覆盖更新</strong>
-                          <p>采用新输入值 ({{ conflictGroups[activeGroupIndex]?.newValue }})</p>
-                        </el-radio>
-                        <el-radio label="keep" border class="repair-radio">
-                          <strong>保持现状</strong>
-                          <p>忽略本次输入，保留原库值 ({{ conflictGroups[activeGroupIndex]?.oldValue }})</p>
-                        </el-radio>
-                        <el-radio label="manual" border class="repair-radio">
-                          <strong>人工修正</strong>
-                          <el-input
-                            size="small"
-                            v-model="conflictGroups[activeGroupIndex].customValue"
-                            placeholder="输入修正后的值"
-                            :disabled="conflictGroups[activeGroupIndex].selectedResolution !== 'manual'"
-                            @click.stop
-                            style="margin-top: 8px;"
-                          />
-                        </el-radio>
-                      </el-radio-group>
-                    </div>
-                    <div class="repair-actions" style="margin-top: 20px;">
-                      <el-button type="success" :loading="loadingRepair" @click="handleSingleRepair">
-                        确认并应用修复
-                      </el-button>
-                    </div>
-                  </el-card>
-                  <el-empty v-else description="请点击左侧冲突项查看方案" />
-                </el-col>
-              </el-row>
-
-              <el-result
-                v-show="conflictStep === 5"
-                icon="success"
-                title="图谱更新完成"
-                sub-title="所有合法数据及修复后的冲突数据，已安全同步至 Neo4j 数据库。"
-                style="background: #fff; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);"
-              >
-                <template #extra>
-                  <el-button type="primary" @click="resetConflictFlow">
-                    继续添加新数据
-                  </el-button>
-                </template>
-              </el-result>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1056,16 +598,8 @@ onUnmounted(() => {
   color: var(--gray-600);
 }
 
-.content-layout {
-  display: flex;
-  gap: 24px;
-}
-.sidebar-menu {
-  width: 200px;
-  flex-shrink: 0;
-}
 .main-content {
-  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -1227,57 +761,6 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.turtle-editor {
-  font-family: 'Fira Code', monospace;
-  :deep(.el-textarea__inner) {
-    background-color: #f8f9fa;
-    color: #333;
-  }
-}
-
-.conflict-item-card {
-  margin-bottom: 12px;
-  cursor: pointer;
-  border-left: 4px solid #f56c6c;
-  transition: all 0.3s;
-  &.is-active {
-    border-left-width: 8px;
-    background-color: #fef0f0;
-    transform: translateX(5px);
-  }
-}
-
-.comparison-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 10px;
-  .val-box {
-    padding: 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    .label { display: block; color: #909399; margin-bottom: 4px; }
-    &.old { background: #f4f4f5; }
-    &.new { background: #fef0f0; color: #f56c6c; font-weight: bold; }
-  }
-}
-
-.repair-radio {
-  display: block;
-  width: 100%;
-  margin-bottom: 10px;
-  height: auto !important;
-  padding: 12px !important;
-  strong { display: block; margin-bottom: 4px; }
-  p { margin: 0; font-size: 12px; color: #666; }
-}
-
-.scroll-container {
-  max-height: 600px;
-  overflow-y: auto;
-  padding-right: 5px;
-}
-
 .action-buttons {
   display: flex;
   align-items: center;
@@ -1299,75 +782,5 @@ onUnmounted(() => {
   .page-desc {
     font-size: 14px;
   }
-  .content-layout {
-    flex-direction: column;
-  }
-  .sidebar-menu {
-    width: 100%;
-  }
-}
-.algorithm-annotation-card {
-  margin-bottom: 24px;
-  border: 1px solid #ebeef5;
-  border-radius: 4px; /* 如果想要截图那种稍微硬朗的直角，可以设为 2px 或 4px */
-  background-color: #ffffff;
-}
-
-/* 头部样式：粗体、大号字、带底边框 */
-.card-header-wrapper {
-  display: flex;
-  align-items: center;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #ebeef5;
-  margin-bottom: 16px;
-}
-
-.header-icon {
-  font-size: 20px;
-  margin-right: 10px;
-}
-
-.header-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: #303133;
-}
-
-/* 简述文本 */
-.main-description {
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 24px;
-  line-height: 1.6;
-}
-
-/* 特征块排版 */
-.features-row {
-  margin-bottom: 24px;
-}
-
-.feature-block {
-  display: flex;
-  align-items: flex-start;
-}
-
-.feature-icon {
-  font-size: 24px;
-  margin-right: 12px;
-  color: #909399; 
-
-}
-
-.feature-title {
-  font-size: 15px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 6px;
-}
-
-.feature-desc {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.5;
 }
 </style>

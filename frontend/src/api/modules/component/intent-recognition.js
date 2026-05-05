@@ -19,33 +19,34 @@ export function intentRecognitionRecognize(params) {
   }, { timeout: 6000 })
 }
 
-
 /**
  * 深度意图识别
  * @param {object} params - { text }
  */
 export function intentRecognitionDeepRecognize(params) {
-  return request.post('/component/intent-recognition/deep-recognize', { 
+  return request.post('/component/intent-recognition/deep-recognize', {
     text: params.text
-  }, { timeout: 300000 })
+  }, { timeout: 10000 })
 }
 
 /**
  * 获取计划
- * @param {object} params - { problem_model }
+ * @param {object} params - { intent_name, domain_name }
  */
 export function intentRecognitionGetPlan(params) {
   return request.post('/component/intent-recognition/get-plan', {
-    problem_model: params.problem_model
-  }, { timeout: 30000000 })
+    intent_name: params.intent_name,
+    domain_name: params.domain_name
+  }, { timeout: 10000 })
 }
 
 /**
- * 获取工具列表
- * @param {object} params - { plan: list[dict] }
+ * 获取工具
+ * @param {object} params - { intent_name, domain_name }
  */
-export function intentRecognitionGetTools(params) {
+export function intentRecognitionGetTools(params = {}) {
   return request.post('/component/intent-recognition/get-tools', {
-    plan: params.plan
-  }, { timeout: 30000000 })
+    intent_name: params.intent_name || '',
+    domain_name: params.domain_name || ''
+  }, { timeout: 10000 })
 }

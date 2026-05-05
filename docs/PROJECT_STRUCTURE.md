@@ -35,7 +35,7 @@ frontend/
 │   │           ├── document-preproc.js
 │   │           ├── knowledge-extract.js
 │   │           ├── kg-update.js
-│   │           ├── nl2cypher.js
+│   │           ├── text-split.js
 │   │           ├── intent-recognition.js
 │   │           └── answer-generation.js
 │   ├── views/
@@ -51,7 +51,7 @@ frontend/
 │   │       │   └── index.vue
 │   │       ├── knowledge-extract/
 │   │       ├── knowledge-graph-update/
-│   │       ├── nl2cypher/
+│   │       ├── text-split/
 │   │       ├── intent-recognition/
 │   │       └── answer-generation/
 │   ├── constants/
@@ -83,7 +83,7 @@ backend/
 │   │       │   └── service.py
 │   │       ├── knowledge_extract/
 │   │       ├── kg_update/
-│   │       ├── nl2cypher/
+│   │       ├── text_split/
 │   │       ├── intent_recognition/
 │   │       └── answer_generation/
 │   ├── services/            # 非组件共享服务
@@ -107,7 +107,7 @@ algorithm/
 ├── preproc/                    # 文档预处理（PDF/DOCX/Excel → Markdown）
 ├── uie/                        # 知识抽取（UIE）
 ├── KGUpdate/                   # 知识图谱更新
-├── NL_to_cypher/               # 自然语言转 Cypher
+├── NL_to_cypher/               # 文本切分
 ├── intent_recognition_model/   # 意图识别
 ├── ans/                        # 答案生成（QA）
 ├── common/                     # 统一 LLM 调用（vLLM/OpenAI/Zhipu）
@@ -123,7 +123,7 @@ algorithm/
 | 文档预处理 | `views/component/document-preproc/` | `modules/component/document_preproc/` | `algorithm/preproc/` |
 | 知识抽取 | `views/component/knowledge-extract/` | `modules/component/knowledge_extract/` | `algorithm/uie/` |
 | 知识图谱更新 | `views/component/knowledge-graph-update/` | `modules/component/kg_update/` | `algorithm/KGUpdate/` |
-| NL2Cypher | `views/component/nl2cypher/` | `modules/component/nl2cypher/` | `algorithm/NL_to_cypher/` |
+| 文本切分 | `views/component/text-split/` | `modules/component/text_split/` | `algorithm/NL_to_cypher/` |
 | 意图识别 | `views/component/intent-recognition/` | `modules/component/intent_recognition/` | `algorithm/intent_recognition_model/` |
 | 答案生成 | `views/component/answer-generation/` | `modules/component/answer_generation/` | `algorithm/ans/` |
 

@@ -9,7 +9,7 @@
 | 文档预处理 | - | - | - | PDF/DOCX/Excel → Markdown |
 | 知识抽取 | - | - | - | UIE 实体关系抽取 |
 | 知识图谱更新 | - | - | - | 三元组增删、图谱统计 |
-| NL2Cypher | - | - | - | 自然语言转 Cypher |
+| 文本切分 | - | - | - | Markdown/递归/字符/Python 切分 |
 | 意图识别 | - | - | - | Milvus + DeepSeek 意图分类 |
 | 答案生成 | - | - | - | Neo4j 知识图谱问答 |
 

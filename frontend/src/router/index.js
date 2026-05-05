@@ -55,19 +55,19 @@ const routes = [
         path: 'index',
         name: 'knowledge-index',
         component: () => import('@/views/knowledge/KnowledgeIndex.vue'),
-        meta: { title: '知识管理概览' }
+        meta: { title: '知识管理概览', requiresAdmin: true }
       },
       {
         path: 'list',
         name: 'knowledge-documents-list',
         component: () => import('@/views/knowledge/documents/DocumentList.vue'),
-        meta: { title: '文档列表' }
+        meta: { title: '文档列表', requiresAdmin: true }
       },
       {
         path: 'upload',
         name: 'knowledge-documents-upload',
         component: () => import('@/views/knowledge/documents/DocumentUpload.vue'),
-        meta: { title: '文档上传' }
+        meta: { title: '文档上传', requiresAdmin: true }
       },
       {
         path: 'documents',
@@ -85,7 +85,7 @@ const routes = [
         path: 'query',
         name: 'knowledge-query',
         component: () => import('@/views/knowledge/KnowledgeQuery.vue'),
-        meta: { title: '知识检索' }
+        meta: { title: '数据库管理', requiresAdmin: true }
       }
     ]
   },

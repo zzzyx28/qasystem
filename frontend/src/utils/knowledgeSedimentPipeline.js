@@ -7,7 +7,7 @@ import {
   checkDocumentNameExists,
   documentPreprocConvert,
   knowledgeExtract,
-  nl2cypherSplitMarkdown,
+  textSplitMarkdown,
   getAvailableModels,
   processSchemaOutput,
   addFromComputed
@@ -259,7 +259,7 @@ export async function runKnowledgeSedimentPipeline({
       storedDocument: null
     })
 
-    const { data: splitRes } = await nl2cypherSplitMarkdown(convertedText, { signal: controller.signal })
+    const { data: splitRes } = await textSplitMarkdown(convertedText, { signal: controller.signal })
     ensureActive()
     let chunks = splitRes?.chunks ?? splitRes?.items ?? splitRes?.results ?? []
     if (!Array.isArray(chunks) || chunks.length === 0) {

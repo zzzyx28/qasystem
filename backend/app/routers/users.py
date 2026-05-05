@@ -44,7 +44,7 @@ async def register(
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> UserRead:
     if not settings.PUBLIC_REGISTRATION_ENABLED:
-        raise HTTPException(status_code=403, detail="公开注册已关闭，请联系管理员开通账号")
+        raise HTTPException(status_code=403, detail="公开注册已关闭，请联系知识管理员开通账号")
 
     stmt = select(User).where(User.username == body.username)
     result = await db.execute(stmt)

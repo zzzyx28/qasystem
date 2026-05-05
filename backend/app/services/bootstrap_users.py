@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 async def ensure_bootstrap_admin(session: AsyncSession) -> None:
-    """若配置了 BOOTSTRAP_ADMIN_*，则保证该账号存在且为管理员。"""
+    """若配置了 BOOTSTRAP_ADMIN_*，则保证该账号存在且为知识管理员。"""
     username = (settings.BOOTSTRAP_ADMIN_USERNAME or "").strip()
     password = settings.BOOTSTRAP_ADMIN_PASSWORD or ""
     if not username or not password:
@@ -35,20 +35,20 @@ async def ensure_bootstrap_admin(session: AsyncSession) -> None:
             )
         )
         await session.commit()
-        logger.info("已创建引导管理员账号: %s", username)
+        logger.info("已创建引导知识管理员账号: %s", username)
         return
 
     if user.role != ROLE_ADMIN:
         user.role = ROLE_ADMIN
         user.hashed_password = bootstrap_hash
         await session.commit()
-        logger.info("已将引导账号设为管理员并更新密码: %s", username)
+        logger.info("已将引导账号设为知识管理员并更新密码: %s", username)
         return
 
-    # 已是管理员：按需重置密码（便于运维恢复）
+    # 已是知识管理员：按需重置密码（便于运维恢复）
     user.hashed_password = bootstrap_hash
     await session.commit()
-    logger.info("已更新引导管理员密码: %s", username)
+    logger.info("已更新引导知识管理员密码: %s", username)
 
 
 async def count_admins(session: AsyncSession) -> int:

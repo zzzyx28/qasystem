@@ -105,7 +105,7 @@ onMounted(() => {
       <div class="hero-text">
         <p class="hero-eyebrow">系统管理</p>
         <h1 class="hero-title">用户管理</h1>
-        <p class="hero-desc">创建账号、分配角色与重置密码。请谨慎删除管理员。</p>
+        <p class="hero-desc">创建账号、分配角色与重置密码。请谨慎删除知识管理员。</p>
       </div>
       <div class="hero-stat">
         <span class="stat-value">{{ userCount }}</span>
@@ -141,7 +141,7 @@ onMounted(() => {
         <el-table-column prop="role" label="角色" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="row.role === 'admin' ? 'danger' : 'info'" effect="light" round size="small">
-              {{ row.role === 'admin' ? '管理员' : '普通用户' }}
+              {{ row.role === 'admin' ? '知识管理员' : '普通用户' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -191,7 +191,7 @@ onMounted(() => {
         <el-form-item label="角色">
           <el-select v-model="createForm.role" placeholder="选择角色" style="width: 100%">
             <el-option label="普通用户" value="user" />
-            <el-option label="管理员" value="admin" />
+            <el-option label="知识管理员" value="admin" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -215,7 +215,7 @@ onMounted(() => {
         <el-form-item label="角色">
           <el-select v-model="editForm.role" style="width: 100%">
             <el-option label="普通用户" value="user" />
-            <el-option label="管理员" value="admin" />
+            <el-option label="知识管理员" value="admin" />
           </el-select>
         </el-form-item>
         <el-form-item label="新密码（留空则不修改）">

@@ -14,9 +14,6 @@ from .routers import admin_users, chat, knowledge, users
 from .modules.component import COMPONENT_ROUTERS
 from .modules.component.document_preproc import service as doc_preproc_service
 
-#冲突检测new
-from app.routers import conclictfix
-
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -104,7 +101,6 @@ app.include_router(chat.router)
 app.include_router(knowledge.router)
 app.include_router(users.router)
 app.include_router(admin_users.router)
-app.include_router(conclictfix.router) #new
 for r in COMPONENT_ROUTERS:
     app.include_router(r)
 

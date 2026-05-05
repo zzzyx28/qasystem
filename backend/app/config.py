@@ -35,12 +35,13 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    DIFY_COMPONENT_API_KEY: str = ""
 
     ENVIRONMENT: str = "development"
 
     DATABASE_URL: str = "mysql+asyncmy://rail_user:123456@127.0.0.1:3306/rail_assistant"
 
-    # 用户与权限：公开注册开关；引导管理员（启动时 upsert，用于首启或密码恢复）
+    # 用户与权限：公开注册开关；引导知识管理员（启动时 upsert，用于首启或密码恢复）
     PUBLIC_REGISTRATION_ENABLED: bool = True
     BOOTSTRAP_ADMIN_USERNAME: str = ""
     BOOTSTRAP_ADMIN_PASSWORD: str = ""

@@ -1,6 +1,6 @@
 # 轨道交通知识服务系统（Railway Assistant）
 
-面向轨道交通领域的知识服务：**知识管理与文档**、基于 **Dify** 的智能问答、以及可在**组件管理**中调用的算法能力（文档预处理、知识抽取、图谱更新、NL2Cypher、意图识别、图谱问答、冲突检测等）。
+面向轨道交通领域的知识服务：**知识管理与文档**、基于 **Dify** 的智能问答、以及可在**组件管理**中调用的算法能力（文档预处理、文本切分、知识抽取、图谱更新、意图识别、图谱问答等）。
 
 - **前后端分离**：Vue 3 + FastAPI。  
 - **算法集成**：后端通过 `sys.path` **进程内**加载 `algorithm/`（非独立微服务）；部署时保持仓库内 `algorithm/` 与 `backend/` 的相对路径。
@@ -81,9 +81,9 @@ cd frontend && npm install && npm run dev
 
 **后端**：`app/main.py`、`app/config.py`、`app/routers/*`、`app/modules/component/*/`（各组件 `router.py` + `service.py`）。
 
-**算法**：`preproc`、`uie`、`KGUpdate`、`NL_to_cypher`、`intent_recognition_model`、`ans/QA`、`common`、`confidence_calculate`、`conflict_detection`。
+**算法**：`preproc`、`uie`、`KGUpdate`、`NL_to_cypher`、`intent_recognition_model`、`ans/QA`、`common`、`confidence_calculate`。
 
-**组件映射**（前端 / 后端 / 算法目录名）：文档预处理 `document-preproc` / `document_preproc` / `preproc`；知识抽取 `knowledge-extract` / `knowledge_extract` / `uie`；图谱更新 `knowledge-graph-update` / `kg_update` / `KGUpdate`；NL2Cypher；意图识别；答案生成 `answer-generation` / `answer_generation` / `ans`。
+**组件映射**（前端 / 后端 / 算法目录名）：文档预处理 `document-preproc` / `document_preproc` / `preproc`；文本切分 `text-split` / `text_split` / `NL_to_cypher`；知识抽取 `knowledge-extract` / `knowledge_extract` / `uie`；图谱更新 `knowledge-graph-update` / `kg_update` / `KGUpdate`；意图识别；答案生成 `answer-generation` / `answer_generation` / `ans`。
 
 ---
 

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from ..modules.component.document_preproc import service as doc_preproc_service
 from ..modules.component.knowledge_extract import service as knowledge_extract_service
 from ..modules.component.kg_update import service as kg_update_service
-from ..modules.component.nl2cypher import service as nl2cypher_service
+from ..modules.component.text_split import service as text_split_service
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +70,14 @@ async def process_document_pipeline(
                 "error": "文档预处理后内容为空"
             }
 
-        # 2. 文本切分：预处理 Markdown → nl2cypher split_by_markdown（语义块）→ knowledge_extract 细化超长块（递归切分）
+        # 2. 文本切分：预处理 Markdown → text_split split_by_markdown（语义块）→ knowledge_extract 细化超长块（递归切分）
         logger.info("开始文本切分（Markdown 主切分 + LLM 安全细化）")
 
         def _split_for_pipeline(full_text: str) -> tuple[list[str], str]:
-            raw = nl2cypher_service.split_by_markdown(full_text).get("chunks") or []
+            raw = text_split_service.split_by_markdown(full_text).get("chunks") or []
             strategy = "split_by_markdown"
             if not raw:
-                raw = nl2cypher_service.split_recursively(full_text).get("chunks") or []
+                raw = text_split_service.split_recursively(full_text).get("chunks") or []
                 strategy = "split_recursively_fallback"
             refined = knowledge_extract_service.refine_chunks_for_llm(raw)
             return refined, strategy
@@ -155,7 +155,7 @@ async def process_document_pipeline(
             "preproc_result": preproc_result,
             "split_result": {
                 "chunk_count": len(chunks),
-                "splitter": "nl2cypher.split_by_markdown + knowledge_extract.refine_chunks_for_llm",
+                "splitter": "text_split.split_by_markdown + knowledge_extract.refine_chunks_for_llm",
                 "split_strategy": split_strategy,
             },
             "extract_result": extract_result,
@@ -235,8 +235,8 @@ def health_check() -> Dict[str, Any]:
         # 检查知识图谱更新服务
         kg_health = kg_update_service.health()
 
-        # 文本切分依赖 nl2cypher 加载 algorithm/NL_to_cypher/splitter
-        nl2cypher_health = nl2cypher_service.health()
+        # 文本切分依赖 text_split 加载 algorithm/NL_to_cypher/splitter
+        text_split_health = text_split_service.health()
         
         return {
             "status": "ok"
@@ -245,7 +245,7 @@ def health_check() -> Dict[str, Any]:
                     preproc_health.get("status") == "ok",
                     extract_health.get("status") == "ok",
                     kg_health.get("status") == "ok",
-                    nl2cypher_health.get("status") == "ok",
+                    text_split_health.get("status") == "ok",
                 ]
             )
             else "unavailable",
@@ -253,7 +253,7 @@ def health_check() -> Dict[str, Any]:
                 "document_preproc": preproc_health,
                 "knowledge_extract": extract_health,
                 "kg_update": kg_health,
-                "nl2cypher": nl2cypher_health,
+                "text_split": text_split_health,
             }
         }
     except Exception as e:

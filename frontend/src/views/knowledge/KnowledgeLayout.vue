@@ -1,24 +1,36 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Document, FolderOpened, Search, Upload } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const activeTab = ref('index')
 
-const tabs = [
+const allTabs = [
   { name: 'index', label: '首页', icon: FolderOpened },
-  { name: 'upload', label: '知识沉淀', icon: Upload },
-  { name: 'list', label: '文档列表', icon: Document },
-  { name: 'query', label: '知识检索', icon: Search }
+  { name: 'upload', label: '知识沉淀', icon: Upload, requiresAdmin: true },
+  { name: 'list', label: '文档列表', icon: Document, requiresAdmin: true },
+  { name: 'query', label: '数据库管理', icon: Search }
 ]
+
+const tabs = computed(() => allTabs.filter((tab) => !tab.requiresAdmin || auth.isAdmin))
 
 watch(
   () => route.path,
   (path) => {
     const match = path.match(/\/knowledge\/(\w+)/)
-    if (match) activeTab.value = match[1]
+    if (!match) return
+    const next = match[1]
+    if (tabs.value.some((tab) => tab.name === next)) {
+      activeTab.value = next
+      return
+    }
+    const fallback = tabs.value[0]?.name || 'query'
+    activeTab.value = fallback
+    router.replace(`/knowledge/${fallback}`)
   },
   { immediate: true }
 )

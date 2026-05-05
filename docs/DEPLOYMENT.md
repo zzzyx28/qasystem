@@ -358,7 +358,7 @@ docker compose exec backend ls /models/hub/models/OpenDataLab
 - `intent-recognition`
 - `knowledge-extract`
 - `kg-update`
-- `nl2cypher`
+- `text-split`
 - `answer-generation`
 
 ---

@@ -19,7 +19,7 @@ const pwdForm = reactive({
 
 const roleLabel = computed(() => {
   const r = auth.user?.role
-  if (r === 'admin') return '管理员'
+  if (r === 'admin') return '知识管理员'
   if (r === 'user') return '普通用户'
   return r || '—'
 })

@@ -12,7 +12,13 @@ export {
   processSchemaOutput,   
   addFromComputed        
 } from './kg-update'
-export { nl2cypherHealthCheck, nl2cypherGenerate } from './nl2cypher'
-export { intentRecognitionHealthCheck, intentRecognitionRecognize } from './intent-recognition'
+export { textSplitHealthCheck } from './text-split'
+export {
+  intentRecognitionHealthCheck,
+  intentRecognitionRecognize,
+  intentRecognitionDeepRecognize,
+  intentRecognitionGetPlan,
+  intentRecognitionGetTools
+} from './intent-recognition'
 export { answerGenerationHealthCheck, answerGenerationAsk, answerGenerationAskVisualize, answerGenerationQueryGraph } from './answer-generation'
 export { documentPreprocHealthCheck, documentPreprocConvert, documentPreprocConvertToPdf, getAvailableModels } from './document-preproc'

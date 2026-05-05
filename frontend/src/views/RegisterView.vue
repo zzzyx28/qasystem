@@ -45,7 +45,7 @@ async function onSubmit() {
   <AuthPageShell
     eyebrow="创建账户"
     title="注册"
-    subtitle="新账号默认为普通用户；若系统尚无用户，首个注册账号将成为管理员。"
+    subtitle="新账号默认为普通用户；若系统尚无用户，首个注册账号将成为知识管理员。"
   >
     <el-form class="auth-form" label-position="top" size="large" @submit.prevent="onSubmit">
       <el-form-item label="用户名">

@@ -1,26 +1,18 @@
 <script setup>
-import { ref, onMounted, watch, computed, nextTick } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { MagicStick, Loading, UploadFilled, Download } from '@element-plus/icons-vue'
-import { nl2cypherHealthCheck, nl2cypherGenerate } from '@/api'
-import { nl2cypherSplitCharacter, nl2cypherSplitRecursive, nl2cypherSplitMarkdown, nl2cypherSplitPython, nl2cypherText2vector } from '@/api'
+import { textSplitHealthCheck, textSplitCharacter, textSplitRecursive, textSplitMarkdown, textSplitPython } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const loading = ref(false)
 const healthStatus = ref(null)
 const healthDetail = ref('')
 
-// 当前选中的主菜单与子菜单
-const activeFeature = ref('cypher')
-const activeSubFeature = ref('')
+// 当前选中的切分方式（下拉框）
+const activeSubFeature = ref('split-char')
 
 // 表单数据
 const form = ref({
-  question: '',
-  graph_schema: `Graph schema: Relevant node labels and their properties are:
-Article
-Keyword
-Author
-Entity`,
   splitText: ''
 })
 
@@ -30,58 +22,21 @@ const currentFile = ref(null)
 const fileName = ref('')
 
 // 结果数据
-const resultCypher = ref('')
 const splitResult = ref(null)
-const vectorResult = ref('')
 
-// 菜单项
-const menuItems = [
-  { key: 'cypher', label: '自然语言转Cypher', tooltip: '输入自然语言, 自动生成符合图谱的 Cypher 查询' },
-  {
-    key: 'split',
-    label: '文本切片',
-    tooltip: '四种文本切片方式的入口',
-    children: [
-      { key: 'split-char', label: '按字符切分', tooltip: '按照字符分割文本，适合简单分段' },
-      { key: 'split-recursive', label: '递归切分', tooltip: '递归地按字符分片，可生成更小的段落' },
-      { key: 'split-markdown', label: 'Markdown 切分', tooltip: '基于 Markdown 语法进行智能切片' },
-      { key: 'split-python', label: 'Python 切分', tooltip: '对 Python 源码进行语言感知的切片' },
-    ],
-  },
-  { key: 'vector', label: '文本向量化与存储', tooltip: '将文本向量化并写入数据库以备后续检索' },
+const splitMethodOptions = [
+  { value: 'split-char', label: '按字符切分' },
+  { value: 'split-recursive', label: '递归切分' },
+  { value: 'split-markdown', label: 'Markdown 切分' },
+  { value: 'split-python', label: 'Python 切分' }
 ]
 
-// 工具提示映射
-const tooltips = {}
-menuItems.forEach(item => {
-  tooltips[item.key] = item.tooltip
-  if (item.children) {
-    item.children.forEach(c => {
-      tooltips[c.key] = c.tooltip
-    })
-  }
-})
-
-// 计算属性
-const vectorDataAvailable = computed(() => {
-  return healthStatus.value === 'ok'
-})
-
-// 监听功能切换
-watch(activeFeature, (newVal) => {
+// 监听切分方式切换
+watch(activeSubFeature, () => {
   form.value.splitText = ''
   splitResult.value = null
-  vectorResult.value = null
-  resultCypher.value = ''
   currentFile.value = null
   fileName.value = ''
-  if (newVal !== 'split') {
-    activeSubFeature.value = ''
-  } else {
-    if (!activeSubFeature.value) {
-      activeSubFeature.value = menuItems.find(i => i.key === 'split')?.children?.[0]?.key || ''
-    }
-  }
 })
 
 // 健康检查
@@ -89,7 +44,7 @@ const checkHealth = async () => {
   healthStatus.value = null
   healthDetail.value = ''
   try {
-    const { data } = await nl2cypherHealthCheck()
+    const { data } = await textSplitHealthCheck()
     if (data?.status === 'ok') {
       healthStatus.value = 'ok'
     } else {
@@ -98,7 +53,7 @@ const checkHealth = async () => {
     }
   } catch {
     healthStatus.value = 'error'
-    healthDetail.value = '请检查后端是否启动并安装 algorithm/NL_to_cypher 依赖，配置 Ollama'
+    healthDetail.value = '请检查后端是否启动并安装 algorithm/NL_to_cypher 依赖'
   }
 }
 
@@ -195,17 +150,15 @@ const downloadSplitResult = () => {
 
 // 提交表单
 const submit = async () => {
-  const active = activeFeature.value === 'split' ? activeSubFeature.value : activeFeature.value
+  const active = activeSubFeature.value
   
   // 检查是否有输入内容
   if (!form.value.splitText?.trim() && !currentFile.value) {
     ElMessage.warning('请输入文本或上传文件')
     return
   }
-  
-  if (active === 'cypher') {
-    await submitCypher()
-  } else if (active === 'split-char') {
+
+  if (active === 'split-char') {
     await submitSplitCharacter()
   } else if (active === 'split-recursive') {
     await submitSplitRecursive()
@@ -213,8 +166,6 @@ const submit = async () => {
     await submitSplitMarkdown()
   } else if (active === 'split-python') {
     await submitSplitPython()
-  } else if (active === 'vector') {
-    await submitVector()
   }
 }
 
@@ -228,7 +179,7 @@ const submitSplitRecursive = async () => {
   loading.value = true
   splitResult.value = null
   try {
-    const { data } = await nl2cypherSplitRecursive(text)
+    const { data } = await textSplitRecursive(text)
     splitResult.value = data
     ElMessage.success('递归字符切分完成')
   } catch (err) {
@@ -248,7 +199,7 @@ const submitSplitMarkdown = async () => {
   loading.value = true
   splitResult.value = null
   try {
-    const { data } = await nl2cypherSplitMarkdown(text)
+    const { data } = await textSplitMarkdown(text)
     splitResult.value = data
     ElMessage.success('Markdown 切分完成')
   } catch (err) {
@@ -268,35 +219,12 @@ const submitSplitPython = async () => {
   loading.value = true
   splitResult.value = null
   try {
-    const { data } = await nl2cypherSplitPython(text)
+    const { data } = await textSplitPython(text)
     splitResult.value = data
     ElMessage.success('Python 切分完成')
   } catch (err) {
     ElMessage.error(err?.response?.data?.detail || err?.message || 'Python 切分失败')
     splitResult.value = null
-  } finally {
-    loading.value = false
-  }
-}
-
-const submitCypher = async () => {
-  const question = form.value.question?.trim()
-  if (!question) {
-    ElMessage.warning('请输入自然语言问题')
-    return
-  }
-  loading.value = true
-  resultCypher.value = ''
-  try {
-    const { data } = await nl2cypherGenerate({
-      question,
-      graph_schema: form.value.graph_schema?.trim() ?? ''
-    })
-    resultCypher.value = data?.cypher ?? ''
-    ElMessage.success('Cypher 生成完成')
-  } catch (err) {
-    ElMessage.error(err?.response?.data?.detail || err?.message || 'Cypher 生成失败')
-    resultCypher.value = ''
   } finally {
     loading.value = false
   }
@@ -311,7 +239,7 @@ const submitSplitCharacter = async () => {
   loading.value = true
   splitResult.value = null
   try {
-    const { data } = await nl2cypherSplitCharacter(text)
+    const { data } = await textSplitCharacter(text)
     splitResult.value = data
     ElMessage.success('字符切分完成')
   } catch (err) {
@@ -322,36 +250,6 @@ const submitSplitCharacter = async () => {
   }
 }
 
-const submitVector = async () => {
-  const text = form.value.splitText?.trim()
-  if (!text) {
-    ElMessage.warning('请输入要向量化的文本或上传文件')
-    return
-  }
-  loading.value = true
-  vectorResult.value = null
-  try {
-    let source
-    if (fileName.value) {
-      source = fileName.value
-    } else {
-      // 取文本前8个字符，如果文本长度超过8则加省略号
-      if (text.length > 8) {
-        source = text.substring(0, 8) + '...'
-      } else {
-        source = text
-      }
-    }
-    const { data } = await nl2cypherText2vector(text,source)
-    vectorResult.value = '存储完成'
-    ElMessage.success('向量化存储完成')
-  } catch (err) {
-    ElMessage.error(err?.response?.data?.detail || err?.message || '向量化失败')
-    vectorResult.value = null
-  } finally {
-    loading.value = false
-  }
-}
 // 组件挂载
 onMounted(() => {
   checkHealth()
@@ -360,21 +258,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="nl2cypher-view">
-    <div class="nl2cypher-bg-deco">
+  <div class="text-split-view">
+    <div class="text-split-bg-deco">
       <span class="circle circle-1"></span>
       <span class="circle circle-2"></span>
     </div>
 
     <!-- 顶部标题与健康状态固定区域 -->
-    <div class="nl2cypher-header">
+    <div class="text-split-header">
       <div class="header-left"></div>
       <div class="header-right">
         <h1 class="page-title">
-          <span class="title-highlight">文本向量化与切片组件</span>
+          <span class="title-highlight">文本切片组件</span>
         </h1>
         <p class="page-desc">
-          将文本转为向量存储、不同逻辑下的文本切片、自然语言转Cypher。
+          提供多策略文本切片能力。
         </p>
         <div v-if="healthStatus !== null" class="health-row">
           <span class="health-label">服务状态：</span>
@@ -395,19 +293,15 @@ onMounted(() => {
               <p>提供以下核心能力：</p>
               <ul>
                 <li>文本按照多策略切片</li>
-                <li>对切片结果生成向量并存储于数据库</li>
-                <li>自然语言问题转换为 Cypher 查询</li>
-                <li>向量数据库可视化展示</li>
               </ul>
             </div>
             <div class="section">
               <h4>使用流程</h4>
               <ol>
-                <li>从左侧菜单选择所需功能（切片 / 向量化 / Cypher）</li>
+                <li>通过下拉框选择切片方式</li>
                 <li>输入文本或上传文件（txt/md/json）</li>
                 <li>点击提交并查看结果</li>
                 <li>切片结果可下载为 JSON 文件</li>
-                <li>向量化操作会在后台写入数据库，可用于后续检索</li>
               </ol>
             </div>
           </div>
@@ -415,93 +309,29 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 主区域：左侧菜单 右侧动态内容 -->
-    <div class="nl2cypher-inner">
-      <!-- 侧边菜单 -->
-      <div class="nl2cypher-menu">
-        <template v-for="item in menuItems" :key="item.key">
-          <div
-            class="menu-entry"
-            :class="{ active: activeFeature === item.key }"
-            @click="activeFeature = item.key"
-          >
-            <el-tooltip :content="tooltips[item.key]" placement="right">
-              <span>{{ item.label }}</span>
-            </el-tooltip>
-          </div>
-
-          <!-- 子菜单显示在文本切片下面 -->
-          <div
-            v-if="item.children && activeFeature === item.key"
-            class="submenu"
-          >
-            <div
-              v-for="child in item.children"
-              :key="child.key"
-              class="menu-entry sub-entry"
-              :class="{ active: activeSubFeature === child.key }"
-              @click.stop="activeSubFeature = child.key"
-            >
-              <el-tooltip :content="tooltips[child.key]" placement="right">
-                <span>{{ child.label }}</span>
-              </el-tooltip>
-            </div>
-          </div>
-        </template>
-      </div>
-
-      <div class="nl2cypher-content">
-        <!-- 生成 Cypher 内容区（保持不变） -->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'cypher'">
-          <template #header>
-            <span>生成 Cypher</span>
-          </template>
-          <el-form label-width="100px" class="nl2cypher-form">
-            <el-form-item label="自然语言问题" required>
-              <el-input
-                v-model="form.question"
-                type="textarea"
-                :rows="3"
-                placeholder="例如：找出图中所有 Article 节点的总数。"
+    <!-- 主区域 -->
+    <div class="text-split-inner">
+      <div class="text-split-content">
+        <el-card class="selector-card" shadow="never">
+          <div class="selector-row">
+            <span class="selector-label">切分方式</span>
+            <el-select v-model="activeSubFeature" class="method-select" placeholder="请选择切分方式">
+              <el-option
+                v-for="option in splitMethodOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
               />
-            </el-form-item>
-            <el-form-item label="图谱 Schema">
-              <el-input
-                v-model="form.graph_schema"
-                type="textarea"
-                :rows="6"
-                placeholder="节点标签与属性描述，用于约束生成的 Cypher。"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button
-                type="primary"
-                :loading="loading"
-                :icon="MagicStick"
-                @click="submit"
-              >
-                生成 Cypher
-              </el-button>
-            </el-form-item>
-          </el-form>
-
-          <div v-if="resultCypher" class="result-box">
-            <div class="result-header">
-              <p class="result-label">生成的 Cypher：</p>
-              <el-button type="primary" size="small" @click="copyToClipboard(resultCypher)" text>
-                复制
-              </el-button>
-            </div>
-            <pre class="result-cypher">{{ resultCypher }}</pre>
+            </el-select>
           </div>
         </el-card>
 
         <!-- 字符切分功能 -->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'split' && activeSubFeature === 'split-char'">
+        <el-card class="form-card" shadow="hover" v-if="activeSubFeature === 'split-char'">
           <template #header>
             <span>字符切分</span>
           </template>
-          <el-form label-width="100px" class="nl2cypher-form">
+          <el-form label-width="100px" class="text-split-form">
             <el-form-item label="输入方式">
               <div class="input-method-selector">
                 <div class="file-upload-area">
@@ -614,11 +444,11 @@ onMounted(() => {
         </el-card>
 
         <!-- 递归字符切分功能 -->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'split' && activeSubFeature === 'split-recursive'">
+        <el-card class="form-card" shadow="hover" v-if="activeSubFeature === 'split-recursive'">
           <template #header>
             <span>递归字符切分</span>
           </template>
-          <el-form label-width="100px" class="nl2cypher-form">
+          <el-form label-width="100px" class="text-split-form">
             <el-form-item label="输入方式">
               <div class="input-method-selector">
                 <div class="file-upload-area">
@@ -731,11 +561,11 @@ onMounted(() => {
         </el-card>
 
         <!-- Markdown 切分功能 -->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'split' && activeSubFeature === 'split-markdown'">
+        <el-card class="form-card" shadow="hover" v-if="activeSubFeature === 'split-markdown'">
           <template #header>
             <span>Markdown 切分</span>
           </template>
-          <el-form label-width="100px" class="nl2cypher-form">
+          <el-form label-width="100px" class="text-split-form">
             <el-form-item label="输入方式">
               <div class="input-method-selector">
                 <div class="file-upload-area">
@@ -848,11 +678,11 @@ onMounted(() => {
         </el-card>
 
         <!-- Python 切分功能 -->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'split' && activeSubFeature === 'split-python'">
+        <el-card class="form-card" shadow="hover" v-if="activeSubFeature === 'split-python'">
           <template #header>
             <span>Python 切分</span>
           </template>
-          <el-form label-width="100px" class="nl2cypher-form">
+          <el-form label-width="100px" class="text-split-form">
             <el-form-item label="输入方式">
               <div class="input-method-selector">
                 <div class="file-upload-area">
@@ -964,133 +794,38 @@ onMounted(() => {
           </div>
         </el-card>
 
-        <!-- 文本向量化功能 -->
-        <el-card class="form-card" shadow="hover" v-if="activeFeature === 'vector'">
-          <template #header>
-            <span>向量化并存储</span>
-          </template>
-          <el-form label-width="100px" class="nl2cypher-form">
-            <el-form-item label="输入方式">
-              <div class="input-method-selector">
-                <div class="file-upload-area">
-                  <input
-                    ref="fileInput"
-                    type="file"
-                    accept=".txt,.md,.markdown,.json"
-                    @change="handleFileUpload"
-                    style="display: none"
-                  />
-                  <el-button
-                    type="primary"
-                    :icon="UploadFilled"
-                    @click="fileInput?.click()"
-                    size="small"
-                  >
-                    上传文件
-                  </el-button>
-                  <span class="file-info" v-if="fileName">
-                    {{ fileName }}
-                    <el-button
-                      type="danger"
-                      text
-                      size="small"
-                      @click="clearFile"
-                    >
-                      清除
-                    </el-button>
-                  </span>
-                  <span class="file-hint" v-else>
-                    支持 txt, md, json 格式，最大 10MB
-                  </span>
-                </div>
-              </div>
-            </el-form-item>
-            
-            <el-form-item label="或输入文本">
-              <el-input
-                v-model="form.splitText"
-                type="textarea"
-                :rows="8"
-                placeholder="请输入要向量化的文本内容，或上传文件..."
-                resize="vertical"
-              />
-            </el-form-item>
-            
-            <el-form-item>
-              <el-button
-                type="primary"
-                :loading="loading"
-                :icon="MagicStick"
-                @click="submit"
-              >
-                开始向量化
-              </el-button>
-            </el-form-item>
-          </el-form>
-
-          <div v-if="vectorResult" class="result-box">
-            <div class="result-header">
-              <p class="result-label">{{ vectorResult }}</p>
-            </div>
-          </div>
-        </el-card>
-        <!-- 其他功能保持占位或说明 -->
-        <el-card class="form-card" shadow="hover" v-if="
-          activeFeature === 'split' && !activeSubFeature ||
-          (activeFeature !== 'cypher' && activeFeature !== 'split' && activeFeature !== 'vector')
-        ">
-          <template #header>
-            <span v-if="activeFeature === 'split'">
-              文本切片
-            </span>
-            <span v-else-if="activeFeature === 'vector'">
-              文本向量化与存储
-            </span>
-            <span v-else>
-              占位功能
-            </span>
-          </template>
-          <div class="placeholder-box">
-            <p v-if="activeFeature === 'split'">
-              请选择左侧子菜单中的一种切片方式。
-            </p>
-            <p v-else>
-              该界面尚未实现具体逻辑，仅作为占位。
-            </p>
-          </div>
-        </el-card>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
-.nl2cypher-view {
+.text-split-view {
   min-height: calc(100vh - var(--nav-height));
   padding: 40px var(--padding-inline) 80px;
   position: relative;
   overflow: hidden;
 }
 
-.nl2cypher-bg-deco {
+.text-split-bg-deco {
   pointer-events: none;
   position: absolute;
   inset: 0;
 }
-.nl2cypher-bg-deco .circle {
+.text-split-bg-deco .circle {
   position: absolute;
   border-radius: 50%;
   background: var(--primary-gradient);
   opacity: 0.06;
   animation: float 5s ease-in-out infinite;
 }
-.nl2cypher-bg-deco .circle-1 {
+.text-split-bg-deco .circle-1 {
   width: 200px;
   height: 200px;
   top: 15%;
   right: 8%;
 }
-.nl2cypher-bg-deco .circle-2 {
+.text-split-bg-deco .circle-2 {
   width: 140px;
   height: 140px;
   bottom: 25%;
@@ -1103,7 +838,7 @@ onMounted(() => {
   50% { transform: translateY(-20px) scale(1.05); }
 }
 
-.nl2cypher-header {
+.text-split-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1112,7 +847,7 @@ onMounted(() => {
   padding: 0 0 24px;
   border-bottom: 1px solid var(--gray-200);
 }
-.nl2cypher-header .header-right {
+.text-split-header .header-right {
   text-align: left;
   flex: 1;
 }
@@ -1155,40 +890,35 @@ onMounted(() => {
   margin: 2px 0;
 }
 
-.nl2cypher-inner {
+.text-split-inner {
   max-width: var(--content-max-width);
   margin: 0 auto;
   position: relative;
   z-index: 1;
-  display: flex;
-  gap: 24px;
 }
-.nl2cypher-menu {
-  width: 160px;
-  flex-shrink: 0;
+.text-split-content {
+  width: 100%;
 }
 
-.menu-entry {
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-  margin-bottom: 4px;
+.selector-card {
+  margin-bottom: 16px;
+  border-radius: 10px;
+}
+
+.selector-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.selector-label {
   font-size: 14px;
   color: var(--gray-700);
-}
-.menu-entry:hover {
-  background-color: var(--gray-100);
-  color: var(--primary);
-}
-.menu-entry.active {
-  background-color: var(--primary-light);
-  color: #258bde;
   font-weight: 500;
 }
-.nl2cypher-content {
-  flex: 1;
-  min-width: 0;
+
+.method-select {
+  width: 240px;
 }
 
 .page-title {
@@ -1223,7 +953,7 @@ onMounted(() => {
   }
 }
 
-.nl2cypher-form {
+.text-split-form {
   max-width: 720px;
   
   .input-method-selector {
@@ -1283,7 +1013,7 @@ onMounted(() => {
     gap: 8px;
   }
 }
-.result-cypher, .result-json {
+.result-json {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.5;
@@ -1296,9 +1026,6 @@ onMounted(() => {
   background: var(--gray-100);
   border-radius: 6px;
   border: 1px solid var(--gray-300);
-}
-.result-cypher {
-  color: var(--primary-dark);
 }
 .result-json {
   color: var(--gray-700);
@@ -1361,7 +1088,7 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .nl2cypher-view {
+  .text-split-view {
     padding: 24px 20px 60px;
   }
   .page-title {
@@ -1370,28 +1097,19 @@ onMounted(() => {
   .page-desc {
     font-size: 14px;
   }
-  .nl2cypher-inner {
-    flex-direction: column;
-  }
-  .nl2cypher-menu {
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 16px;
-    .menu-entry {
-      flex: 1;
-      min-width: 120px;
-      text-align: center;
-      margin-bottom: 0;
-    }
-  }
   .chunk-header {
     flex-wrap: wrap;
     gap: 8px;
   }
+  .selector-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .method-select {
+    width: 100%;
+  }
   
-  .nl2cypher-form {
+  .text-split-form {
     .input-method-selector {
       .file-upload-area {
         .file-info {
@@ -1404,213 +1122,6 @@ onMounted(() => {
   }
 }
 
-/* submenu styling */
-.submenu {
-  margin-left: 16px;
-  margin-top: 4px;
-}
-.sub-entry {
-  padding-left: 24px;
-  font-size: 13px;
-}
-.sub-entry.active {
-  font-weight: 500;
-}
-
-/* 可视化样式 */
-.visualization-container {
-  .visualization-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding: 16px;
-    background: var(--gray-50);
-    border-radius: 8px;
-    
-    .control-group {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    
-    .slider-with-label {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 4px;
-      
-      .slider-label {
-        font-size: 12px;
-        color: var(--gray-600);
-        font-weight: 500;
-      }
-    }
-  }
-  
-  .visualization-main {
-    min-height: 500px;
-    border: 1px solid var(--gray-200);
-    border-radius: 8px;
-    background: white;
-    position: relative;
-    margin-bottom: 20px;
-    
-    .loading-container {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 500px;
-      color: var(--gray-600);
-      
-      p {
-        margin-top: 10px;
-      }
-    }
-    
-    .visualization-canvas-container {
-      position: relative;
-      height: 500px;
-      
-      .canvas-wrapper {
-        position: relative;
-        height: 450px;
-        overflow: hidden;
-        cursor: crosshair;
-        background: #f8f9fa;
-        border-radius: 4px;
-      }
-      
-      .vector-canvas {
-        width: 100%;
-        height: 100%;
-        display: block;
-      }
-      
-      .tooltip {
-        position: fixed;
-        background: white;
-        border: 1px solid var(--gray-300);
-        border-radius: 6px;
-        padding: 12px;
-        max-width: 300px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        z-index: 1000;
-        pointer-events: none;
-        
-        .tooltip-content {
-          h4 {
-            margin: 0 0 8px 0;
-            color: var(--gray-900);
-            font-size: 14px;
-          }
-          
-          .tooltip-text {
-            max-height: 200px;
-            overflow-y: auto;
-            font-size: 12px;
-            line-height: 1.4;
-            color: var(--gray-700);
-            margin-bottom: 8px;
-          }
-          
-          .tooltip-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            color: var(--gray-500);
-            
-            span {
-              display: inline-block;
-              margin-right: 8px;
-            }
-          }
-        }
-      }
-    }
-    
-    .visualization-legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 12px;
-      border-top: 1px solid var(--gray-200);
-      background: var(--gray-50);
-      
-      .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 12px;
-        
-        .legend-color {
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-        }
-        
-        .legend-count {
-          color: var(--gray-500);
-        }
-      }
-    }
-    
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 500px;
-      color: var(--gray-600);
-      
-      .el-empty {
-        .el-empty__description {
-          p {
-            margin-top: 8px;
-            color: var(--gray-500);
-            font-size: 13px;
-          }
-        }
-      }
-    }
-  }
-  
-  .vector-stats {
-    .stat-card {
-      text-align: center;
-      padding: 16px;
-      background: var(--gray-50);
-      border-radius: 6px;
-      transition: transform 0.2s, box-shadow 0.2s;
-      cursor: default;
-      
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      }
-      
-      .stat-value {
-        font-size: 24px;
-        font-weight: 600;
-        color: var(--primary);
-        margin-bottom: 4px;
-        transition: color 0.2s;
-      }
-      
-      &:hover .stat-value {
-        color: var(--primary-dark);
-      }
-      
-      .stat-label {
-        font-size: 12px;
-        color: var(--gray-600);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-    }
-  }
-}
 .results-list {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
   font-size: 14px;

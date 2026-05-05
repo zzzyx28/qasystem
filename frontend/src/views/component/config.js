@@ -24,11 +24,11 @@ for (const path of Object.keys(modules)) {
 // 按固定顺序展示（可调整 manifest 中的 order 字段扩展）
 const order = [
   'document-preproc',
-  'intent-recognition',
-  'answer-generation',
-  'nl2cypher',
+  'text-split',
+  'knowledge-extract',
   'knowledge-graph-update',
-  'knowledge-extract'
+  'intent-recognition',
+  'answer-generation'
 ]
 componentMenuItems.sort((a, b) => {
   const ia = order.indexOf(a.id)

@@ -1,6 +1,6 @@
 """
 知识抽取：进程内调用 algorithm/uie 算法。
-长文本或 Markdown 大块统一走切块抽取；超长块经 nl2cypher 递归切分细化后再喂 UIE。
+长文本或 Markdown 大块统一走切块抽取；超长块经 text_split 递归切分细化后再喂 UIE。
 """
 import json
 import logging
@@ -40,7 +40,7 @@ def refine_chunks_for_llm(chunks: list[str]) -> list[str]:
     将上游切分结果（如 Markdown 标题块）中仍过长的片段，用 algorithm/NL_to_cypher 的递归切分再细分，
     保证每段不超过 _CHUNK_CHAR_SOFT_LIMIT，与 UIE 逐块抽取的上下游一致。
     """
-    from ..nl2cypher import service as nl2cypher_service
+    from ..text_split import service as text_split_service
 
     out: list[str] = []
     for raw in chunks or []:
@@ -50,7 +50,7 @@ def refine_chunks_for_llm(chunks: list[str]) -> list[str]:
         if len(c) <= _CHUNK_CHAR_SOFT_LIMIT:
             out.append(c)
             continue
-        sub = nl2cypher_service.split_recursively(c).get("chunks") or []
+        sub = text_split_service.split_recursively(c).get("chunks") or []
         for s in sub:
             s = (s or "").strip()
             if s:

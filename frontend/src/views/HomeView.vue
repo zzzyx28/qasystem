@@ -18,7 +18,7 @@ import {
   documentPreprocHealthCheck,
   intentRecognitionHealthCheck,
   answerGenerationHealthCheck,
-  nl2cypherHealthCheck,
+  textSplitHealthCheck,
   extractHealthCheck,
   kgUpdateHealthCheck
 } from '@/api'
@@ -83,7 +83,7 @@ const allFeatures = [
   },
   {
     title: '知识管理',
-    desc: '管理文档资产、执行知识检索与统一知识沉淀。',
+    desc: '管理文档资产、执行数据库管理与统一知识沉淀。',
     icon: Collection,
     path: '/knowledge',
     requiresAdmin: true
@@ -174,7 +174,7 @@ async function loadRealStats() {
     documentPreprocHealthCheck(),
     intentRecognitionHealthCheck(),
     answerGenerationHealthCheck(),
-    nl2cypherHealthCheck(),
+    textSplitHealthCheck(),
     extractHealthCheck(),
     kgUpdateHealthCheck()
   ])
