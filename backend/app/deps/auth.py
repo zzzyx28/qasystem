@@ -70,7 +70,7 @@ async def require_admin(
     if current_user.role != ROLE_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="需要知识管理员权限",
+            detail="需要系统管理员权限",
         )
     return current_user
 
